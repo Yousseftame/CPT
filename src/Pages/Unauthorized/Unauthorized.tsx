@@ -130,7 +130,7 @@ const Unauthorized = () => {
                   </div>
                 </button>
 
-                <button
+                {/* <button
                   onClick={() => navigate("/dashboard")}
                   className="group relative px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-2xl overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg shadow-purple-500/30"
                 >
@@ -139,7 +139,7 @@ const Unauthorized = () => {
                     <Home size={20} />
                     Dashboard
                   </div>
-                </button>
+                </button> */}
 
                 <button
                   onClick={handleLogout}

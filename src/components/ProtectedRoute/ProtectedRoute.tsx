@@ -12,37 +12,37 @@ interface ProtectedRouteProps {
 
 
 
-const ProtectedRoute = ({ children, allowedRoles = ["admin", "superAdmin"] }: ProtectedRouteProps) => {
+const ProtectedRoute = ({
+  children,
+  allowedRoles = ["admin", "superAdmin"],
+}: ProtectedRouteProps) => {
   const { user, loading, role } = useAuth();
-  const [isVerifying, setIsVerifying] = useState(true);
-  const [hasReloaded, setHasReloaded] = useState(false);
 
-  useEffect(() => {
-    const verifyUser = async () => {
-      if (user && !loading && !hasReloaded) {
-        try {
-          await user.reload(); // reload مرة واحدة فقط
-        } catch (err) {
-          console.error("Error reloading user:", err);
-        }
-        setHasReloaded(true);
-      }
-      setIsVerifying(false);
-    };
-
-    if (!loading) verifyUser();
-  }, [user, loading, hasReloaded]);
-
-  if (loading || isVerifying || role === null) {
+  // 1️⃣ Still checking auth
+  if (loading) {
     return <FullScreenLoader />;
   }
 
-  if (!user) return <Navigate to="/login" replace />;
-  if (!user.emailVerified) return <Navigate to="/verify-account" replace />;
-  if (!role || !allowedRoles.includes(role)) return <Navigate to="/unauthorized" replace />;
+  // 2️⃣ Not logged in
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
+  // 3️⃣ Email not verified
+  if (!user.emailVerified) {
+    return <Navigate to="/verify-account" replace />;
+  }
+
+  // 4️⃣ Logged in BUT not admin/superAdmin
+  if (!role || !allowedRoles.includes(role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  // 5️⃣ Authorized
   return <>{children}</>;
 };
 
-
 export default ProtectedRoute;
+
+
+

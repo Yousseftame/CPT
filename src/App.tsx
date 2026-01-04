@@ -108,7 +108,7 @@ function App() {
         { path: "/admins/create", element: <CreateAdmin /> },
         { path: "/admins/:id", element: <AdminDetails /> },
         { path: "/admins/:id/edit", element: <EditAdmin /> },
-        { path: "audit-logs", element: <AuditLogs /> }
+        { path: "audit-logs", element:<ProtectedRoute allowedRoles={["superAdmin"]}><AuditLogs /></ProtectedRoute> }
        
 
       

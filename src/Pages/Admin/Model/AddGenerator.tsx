@@ -1,5 +1,4 @@
 // src/Pages/Admin/Model/AddGenerator.tsx
-
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { TextField, Button, Paper, Divider, Box } from "@mui/material";
 import { collection, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
@@ -10,7 +9,6 @@ import { ArrowLeft, Save, Zap } from "lucide-react";
 import Grid from '@mui/material/Grid';
 import { auditLogger } from "../../../service/auditLogger";
 import { uploadFiles } from "../../../service/uploadFiles";
-
 
 interface Specifications {
   phase: string;
@@ -28,7 +26,6 @@ interface GeneratorModel {
   galleryImages?: string[];
   troubleshootingPDFs?: string[];
 }
-
 
 const categories = [
   "Portable",
@@ -59,7 +56,6 @@ export default function AddGenerator() {
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
-
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -143,6 +139,7 @@ export default function AddGenerator() {
       console.log("Document written with ID: ", generatorId);
 
       // 🔥 NOW upload files with the generatorId in the path
+      // uploadFiles now returns SECURE proxy URLs instead of public Firebase URLs
       const galleryImagesUrls = imageFiles.length > 0
         ? await uploadFiles(imageFiles, generatorId, "gallery-images")
         : [];
@@ -151,7 +148,7 @@ export default function AddGenerator() {
         ? await uploadFiles(pdfFiles, generatorId, "troubleshooting-pdfs")
         : [];
 
-      // 🔥 Update the document with the file URLs
+      // 🔥 Update the document with the secure file URLs
       if (galleryImagesUrls.length > 0 || troubleshootingPdfUrls.length > 0) {
         await updateDoc(docRef, {
           galleryImages: galleryImagesUrls,

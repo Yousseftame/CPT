@@ -364,9 +364,12 @@ const [pdfFiles, setPdfFiles] = useState<File[]>([]);
           </Box>
 
           <Box sx={{ mb: 4 }}>
+            
   <h2 className="text-xl font-semibold text-gray-800 mb-2">
+    
     Gallery Images (Optional)
   </h2>
+  
 
   <input
     type="file"

@@ -12,15 +12,23 @@ import {
   Settings,
   Package,
   Calendar,
-  Tag
+  Tag,
+  FileText,
+  Download,
+  Image as ImageIcon,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  ExternalLink
 } from "lucide-react";
 import { 
   Paper, 
   Button, 
   Chip, 
- 
   Box,
-  Divider 
+  Divider,
+  Dialog,
+  IconButton
 } from "@mui/material";
 import PagesLoader from "../../../components/shared/PagesLoader";
 
@@ -36,6 +44,8 @@ interface GeneratorModel {
     phase: string;
     voltage: string;
   };
+  galleryImages?: string[];
+  troubleshootingPDFs?: string[];
   createdAt?: any;
   updatedAt?: any;
 }
@@ -45,6 +55,8 @@ export default function ViewGeneratorDetails() {
   const navigate = useNavigate();
   const [model, setModel] = useState<GeneratorModel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   useEffect(() => {
     const fetchModel = async () => {
@@ -74,29 +86,55 @@ export default function ViewGeneratorDetails() {
     fetchModel();
   }, [id, navigate]);
 
-  // format date for days / hours 
-const formatDate = (timestamp: any) => {
-  if (!timestamp) return "N/A";
-  try {
-    return new Date(timestamp.toDate()).toLocaleString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit", // اختياري
-      hour12: true, // AM / PM
-    });
-  } catch {
-    return "N/A";
-  }
-};
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return "N/A";
+    try {
+      return new Date(timestamp.toDate()).toLocaleString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    } catch {
+      return "N/A";
+    }
+  };
 
+  const openImageDialog = (index: number) => {
+    setSelectedImageIndex(index);
+    setImageDialogOpen(true);
+  };
+
+  const handleNextImage = () => {
+    if (model?.galleryImages) {
+      setSelectedImageIndex((prev) => 
+        prev === model.galleryImages!.length - 1 ? 0 : prev + 1
+      );
+    }
+  };
+
+  const handlePrevImage = () => {
+    if (model?.galleryImages) {
+      setSelectedImageIndex((prev) => 
+        prev === 0 ? model.galleryImages!.length - 1 : prev - 1
+      );
+    }
+  };
+
+  const handleDownloadPDF = (url: string, index: number) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${model?.name}_troubleshooting_${index + 1}.pdf`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   if (loading) {
-    return (
-      < PagesLoader text="Loading generator model data..." />
-    );
+    return <PagesLoader text="Loading generator model data..." />;
   }
 
   if (!model) {
@@ -104,7 +142,7 @@ const formatDate = (timestamp: any) => {
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", p: { xs: 2, md: 3 } }}>
+    <Box sx={{ maxWidth: 1400, mx: "auto", p: { xs: 2, md: 3 } }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Button
@@ -211,6 +249,86 @@ const formatDate = (timestamp: any) => {
             </Box>
           </Paper>
 
+          {/* Gallery Images Section */}
+          {model.galleryImages && model.galleryImages.length > 0 && (
+            <Paper elevation={0} sx={{ 
+              p: 4, 
+              border: '1px solid', 
+              borderColor: 'grey.200', 
+              borderRadius: 3 
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                <ImageIcon className="text-indigo-600" size={24} />
+                <h2 className="text-xl font-semibold text-gray-800">Gallery Images</h2>
+                <Chip 
+                  label={`${model.galleryImages.length} ${model.galleryImages.length === 1 ? 'image' : 'images'}`}
+                  size="small"
+                  sx={{ bgcolor: '#EEF2FF', color: '#4F46E5', ml: 'auto' }}
+                />
+              </Box>
+              <Divider sx={{ mb: 3 }} />
+
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' },
+                gap: 2
+              }}>
+                {model.galleryImages.map((img, index) => (
+                  <Box
+                    key={index}
+                    onClick={() => openImageDialog(index)}
+                    sx={{
+                      position: 'relative',
+                      paddingTop: '100%',
+                      borderRadius: 2,
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'scale(1.05)',
+                        boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
+                        '& .overlay': {
+                          opacity: 1
+                        }
+                      }
+                    }}
+                  >
+                    <img
+                      src={img}
+                      alt={`Gallery ${index + 1}`}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                    <Box
+                      className="overlay"
+                      sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        bgcolor: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: 0,
+                        transition: 'opacity 0.3s ease'
+                      }}
+                    >
+                      <ExternalLink size={24} color="white" />
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
+          )}
+
           {/* Description Card */}
           <Paper elevation={0} sx={{ 
             p: 4, 
@@ -306,6 +424,99 @@ const formatDate = (timestamp: any) => {
             <p className="text-sm opacity-90">EGP</p>
           </Paper>
 
+          {/* Troubleshooting PDFs Section */}
+          {model.troubleshootingPDFs && model.troubleshootingPDFs.length > 0 && (
+            <Paper elevation={0} sx={{ 
+              p: 4, 
+              border: '1px solid', 
+              borderColor: 'grey.200', 
+              borderRadius: 3 
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                <FileText className="text-indigo-600" size={24} />
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Troubleshooting PDFs
+                </h2>
+              </Box>
+              <Divider sx={{ mb: 3 }} />
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {model.troubleshootingPDFs.map((pdf, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      p: 3,
+                      bgcolor: '#F9FAFB',
+                      borderRadius: 2,
+                      border: '2px solid transparent',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        borderColor: '#5E35B1',
+                        bgcolor: '#F3F4F6',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 12px rgba(94, 53, 177, 0.15)'
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Box sx={{ 
+                        p: 1.5, 
+                        bgcolor: 'white', 
+                        borderRadius: 1.5,
+                        border: '1px solid #E5E7EB'
+                      }}>
+                        <FileText size={20} className="text-red-600" />
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <p className="text-sm font-semibold text-gray-800">
+                          Troubleshooting Guide {index + 1}
+                        </p>
+                        <p className="text-xs text-gray-500">PDF Document</p>
+                      </Box>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<ExternalLink size={16} />}
+                        onClick={() => window.open(pdf, '_blank')}
+                        sx={{
+                          flex: 1,
+                          textTransform: 'none',
+                          borderColor: '#5E35B1',
+                          color: '#5E35B1',
+                          '&:hover': {
+                            borderColor: '#4338CA',
+                            bgcolor: '#F3F4F6'
+                          }
+                        }}
+                      >
+                        View
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        startIcon={<Download size={16} />}
+                        onClick={() => handleDownloadPDF(pdf, index)}
+                        sx={{
+                          flex: 1,
+                          textTransform: 'none',
+                          bgcolor: '#5E35B1',
+                          '&:hover': {
+                            bgcolor: '#4338CA'
+                          }
+                        }}
+                      >
+                        Download
+                      </Button>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
+          )}
+
           {/* Product Info Card */}
           <Paper elevation={0} sx={{ 
             p: 4, 
@@ -345,7 +556,6 @@ const formatDate = (timestamp: any) => {
                 </Box>
                 <p className="text-gray-900 font-semibold">
                   {formatDate(model.createdAt)}
-                  
                 </p>
               </Box>
 
@@ -389,10 +599,131 @@ const formatDate = (timestamp: any) => {
                   Generator
                 </span>
               </Box>
+              {model.galleryImages && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="text-sm text-gray-600">Images</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {model.galleryImages.length}
+                  </span>
+                </Box>
+              )}
+              {model.troubleshootingPDFs && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="text-sm text-gray-600">Documents</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {model.troubleshootingPDFs.length}
+                  </span>
+                </Box>
+              )}
             </Box>
           </Paper>
         </Box>
       </Box>
+
+      {/* Image Viewer Dialog */}
+      <Dialog
+        open={imageDialogOpen}
+        onClose={() => setImageDialogOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: 'transparent',
+            boxShadow: 'none',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <Box sx={{ position: 'relative', bgcolor: 'rgba(0,0,0,0.95)', p: 2 }}>
+          <IconButton
+            onClick={() => setImageDialogOpen(false)}
+            sx={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              color: 'white',
+              bgcolor: 'rgba(255,255,255,0.1)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+              zIndex: 1
+            }}
+          >
+            <X size={24} />
+          </IconButton>
+
+          <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
+            {model.galleryImages && model.galleryImages.length > 1 && (
+              <>
+                <IconButton
+                  onClick={handlePrevImage}
+                  sx={{
+                    position: 'absolute',
+                    left: 16,
+                    color: 'white',
+                    bgcolor: 'rgba(255,255,255,0.1)',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+                  }}
+                >
+                  <ChevronLeft size={32} />
+                </IconButton>
+
+                <IconButton
+                  onClick={handleNextImage}
+                  sx={{
+                    position: 'absolute',
+                    right: 16,
+                    color: 'white',
+                    bgcolor: 'rgba(255,255,255,0.1)',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+                  }}
+                >
+                  <ChevronRight size={32} />
+                </IconButton>
+              </>
+            )}
+
+            {model.galleryImages && (
+              <img
+                src={model.galleryImages[selectedImageIndex]}
+                alt={`Gallery ${selectedImageIndex + 1}`}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '70vh',
+                  objectFit: 'contain',
+                  borderRadius: '8px'
+                }}
+              />
+            )}
+          </Box>
+
+          {model.galleryImages && model.galleryImages.length > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, gap: 1 }}>
+              {model.galleryImages.map((_, index) => (
+                <Box
+                  key={index}
+                  onClick={() => setSelectedImageIndex(index)}
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: index === selectedImageIndex ? 'white' : 'rgba(255,255,255,0.3)',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      bgcolor: 'rgba(255,255,255,0.7)'
+                    }
+                  }}
+                />
+              ))}
+            </Box>
+          )}
+
+          <Box sx={{ textAlign: 'center', mt: 2, color: 'white' }}>
+            <p className="text-sm opacity-70">
+              Image {selectedImageIndex + 1} of {model.galleryImages?.length}
+            </p>
+          </Box>
+        </Box>
+      </Dialog>
     </Box>
   );
 }

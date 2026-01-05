@@ -18,7 +18,7 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db, functions } from '../../service/firebase';
 import toast from 'react-hot-toast';
 import { auditLogger } from '../../service/auditLogger';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import {  httpsCallable } from 'firebase/functions';
 
 
 

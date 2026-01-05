@@ -1,5 +1,5 @@
-import  { useState, useEffect } from "react";
-import { MailCheck, ArrowRight, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MailCheck, ArrowRight, Clock, RefreshCw } from "lucide-react";
 import { sendEmailVerification } from "firebase/auth";
 import { auth } from "../../../service/firebase";
 import { useNavigate } from "react-router-dom";
@@ -11,6 +11,7 @@ import AuthButton from "../../../components/shared/AuthButton";
 
 const VerifyAccount = () => {
   const [loading, setLoading] = useState(false);
+  const [checkingVerification, setCheckingVerification] = useState(false);
   const [error, setError] = useState("");
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [isDisabled, setIsDisabled] = useState(false);
@@ -59,7 +60,8 @@ const VerifyAccount = () => {
 
     try {
       if (!auth.currentUser) {
-        setError("You must be logged in to verify your email. Please login first.");
+        setError("Session expired. Please login again to verify your email.");
+        setTimeout(() => navigate('/login'), 2000);
         return;
       }
 
@@ -87,6 +89,33 @@ const VerifyAccount = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCheckVerification = async () => {
+    setCheckingVerification(true);
+    setError("");
+
+    try {
+      if (!auth.currentUser) {
+        setError("Session expired. Please login again.");
+        setTimeout(() => navigate('/login'), 2000);
+        return;
+      }
+
+      // Reload user to get latest emailVerified status
+      await auth.currentUser.reload();
+      
+      if (auth.currentUser.emailVerified) {
+        toast.success("Email verified successfully!");
+        navigate('/dashboard');
+      } else {
+        toast.error("Email not verified yet. Please check your inbox and click the verification link.");
+      }
+    } catch (err: any) {
+      setError("Failed to check verification status. Please try again.");
+    } finally {
+      setCheckingVerification(false);
     }
   };
 
@@ -125,24 +154,36 @@ const VerifyAccount = () => {
         }
       </p>
 
-      <AuthButton
-        type="button"
-        onClick={handleVerifyAccount}
-        loading={loading}
-        disabled={isDisabled || loading}
-        loadingText="Sending..."
-        icon={<ArrowRight size={20} />}
-      >
-        {cooldownSeconds > 0 ? `Resend in ${formatTime(cooldownSeconds)}` : "Send Verification Email"}
-      </AuthButton>
+      <div className="space-y-3">
+        <AuthButton
+          type="button"
+          onClick={handleVerifyAccount}
+          loading={loading}
+          disabled={isDisabled || loading}
+          loadingText="Sending..."
+          icon={<ArrowRight size={20} />}
+        >
+          {cooldownSeconds > 0 ? `Resend in ${formatTime(cooldownSeconds)}` : "Send Verification Email"}
+        </AuthButton>
+
+        <button
+          type="button"
+          onClick={handleCheckVerification}
+          disabled={checkingVerification}
+          className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCw size={20} className={checkingVerification ? "animate-spin" : ""} />
+          {checkingVerification ? "Checking..." : "I've Verified My Email"}
+        </button>
+      </div>
 
       <p className="text-center text-sm text-gray-600 mt-10">
-        Already verified?{" "}
+        Need to login with a different account?{" "}
         <button
           onClick={() => navigate("/login")}
           type="button"
           className="text-indigo-600 hover:text-indigo-800 font-semibold"
-          disabled={loading}
+          disabled={loading || checkingVerification}
         >
           Go to Login
         </button>

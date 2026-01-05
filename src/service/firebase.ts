@@ -6,6 +6,7 @@ import { getAnalytics } from "firebase/analytics";
 import { getFunctions } from 'firebase/functions';
 
 
+
 const firebaseConfig = {
   apiKey: "AIzaSyBtPa7wVgTwTcsdq8h0FOPJ7sUNKNoXr5M",
   authDomain: "thinkstudio-cpt.firebaseapp.com",

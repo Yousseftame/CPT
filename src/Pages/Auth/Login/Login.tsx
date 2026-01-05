@@ -46,12 +46,11 @@ const Login = () => {
       localStorage.setItem('userName', adminData.name || '');
       localStorage.setItem('userStatus', adminData.status || 'active');
 
-      // Check if email is verified
+      // Check if email is verified - REDIRECT instead of blocking
       if (!currentUser?.emailVerified) {
-        setError('Please verify your email before logging in.');
+        toast.error('Please verify your email to continue.');
         navigate('/verify-account');
-        toast.error('Please verify your email first.');
-        await signOut(auth);
+        // DON'T sign out - keep user logged in so they can verify
         return;
       }
 

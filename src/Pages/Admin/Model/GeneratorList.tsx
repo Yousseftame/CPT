@@ -28,12 +28,14 @@ import {
   MoreVertical,
   X,
   AlertTriangle,
-  Eye
+  Eye,
+  Check
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../../service/firebase";
 import toast from "react-hot-toast";
 import PagesLoader from "../../../components/shared/PagesLoader";
+import { deleteFileByUrl } from "../../../service/deleteFileByUrl";
 
 interface GeneratorModel {
   id: string;
@@ -47,6 +49,9 @@ interface GeneratorModel {
     phase: string;
     voltage: string;
   };
+   galleryImages?: string[];
+  troubleshootingPDFs?: string[];
+  
 }
 
 export default function GeneratorList() {
@@ -61,6 +66,7 @@ export default function GeneratorList() {
   const [modelToDelete, setModelToDelete] = useState<GeneratorModel | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedModel, setSelectedModel] = useState<GeneratorModel | null>(null);
+  const [disableLoading, setDisableLoading] = useState(false);
   
   const navigate = useNavigate();
 
@@ -114,20 +120,42 @@ export default function GeneratorList() {
     setPage(0);
   }, [searchTerm, categoryFilter, models]);
 
-  const handleDelete = async () => {
-    if (!modelToDelete) return;
 
-    try {
-      await deleteDoc(doc(db, "generatorModels", modelToDelete.id));
-      toast.success(`${modelToDelete.name} deleted successfully`);
-      setDeleteDialog(false);
-      setModelToDelete(null);
-      fetchModels();
-    } catch (error) {
-      toast.error("Failed to delete model");
-      console.error(error);
-    }
-  };
+  // delete model 
+  const handleDelete = async () => {
+  if (!modelToDelete) return;
+
+   setDisableLoading(true);
+  try {
+    const {
+      id,
+      name,
+      galleryImages = [],
+      troubleshootingPDFs = [],
+    } = modelToDelete;
+
+    // 1. delete storage files first
+    await Promise.all([
+      ...galleryImages.map(deleteFileByUrl),
+      ...troubleshootingPDFs.map(deleteFileByUrl),
+    ]);
+
+    // 2.  delete firestore document
+    await deleteDoc(doc(db, "generatorModels", id));
+
+    toast.success(`${name} deleted successfully`);
+    setDeleteDialog(false);
+    setModelToDelete(null);
+    fetchModels();
+  } catch (error) {
+    console.error(error);
+    toast.error("Failed to delete model");
+  }
+  finally {
+    setDisableLoading(false);
+  }
+};
+
 
   const openDeleteDialog = (model: GeneratorModel) => {
     setModelToDelete(model);
@@ -415,6 +443,7 @@ export default function GeneratorList() {
             onClick={() => setDeleteDialog(false)}
             variant="outlined"
             sx={{ textTransform: 'none' }}
+            disabled={disableLoading}
           >
             Cancel
           </Button>
@@ -424,8 +453,9 @@ export default function GeneratorList() {
             color="error"
             startIcon={<Trash2 size={16} />}
             sx={{ textTransform: 'none' }}
+            disabled={disableLoading}
           >
-            Delete Model
+            {disableLoading ? <Check  /> : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

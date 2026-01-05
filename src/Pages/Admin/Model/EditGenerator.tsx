@@ -8,6 +8,8 @@ import { ArrowLeft, Save, Zap } from "lucide-react";
 import Grid from '@mui/material/Grid';
 import PagesLoader from "../../../components/shared/PagesLoader";
 import { auditLogger } from "../../../service/auditLogger";
+import { uploadFiles } from "../../../service/uploadFiles";
+import { deleteFileByUrl } from "../../../service/deleteFileByUrl";
 
 interface Specifications {
   phase: string;
@@ -22,7 +24,11 @@ interface GeneratorModel {
   powerRating: string;
   description: string;
   specifications: Specifications;
+
+  galleryImages?: string[];
+  troubleshootingPDFs?: string[];
 }
+
 
 const categories = [
   "Portable",
@@ -54,6 +60,19 @@ export default function EditGenerator() {
       voltage: "",
     },
   });
+  // existing files from firestore
+const [existingImages, setExistingImages] = useState<string[]>([]);
+const [existingPdfs, setExistingPdfs] = useState<string[]>([]);
+
+// new selected files
+const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+const [newPdfFiles, setNewPdfFiles] = useState<File[]>([]);
+
+//  original files for comparison 
+const [originalImages, setOriginalImages] = useState<string[]>([]);
+const [originalPdfs, setOriginalPdfs] = useState<string[]>([]);
+
+  
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -72,6 +91,10 @@ export default function EditGenerator() {
             price: data.price.toString(),
           };
           setFormData(modelData);
+          setExistingImages(data.galleryImages || []);
+          setExistingPdfs(data.troubleshootingPDFs || []);
+          setOriginalImages(data.galleryImages || []);
+          setOriginalPdfs(data.troubleshootingPDFs || []);
           setOriginalData(modelData);
         } else {
           toast.error("Model not found");
@@ -145,21 +168,53 @@ export default function EditGenerator() {
     try {
       const docRef = doc(db, "generatorModels", id);
 
+
+           // upload new files
+const newImageUrls = newImageFiles.length
+  ? await uploadFiles(newImageFiles, "generators/gallery-images")
+  : [];
+
+const newPdfUrls = newPdfFiles.length
+  ? await uploadFiles(newPdfFiles, "generators/troubleshooting-pdfs")
+  : [];
+
+// detect removed files
+const removedImages = originalImages.filter(
+  img => !existingImages.includes(img)
+);
+
+const removedPdfs = originalPdfs.filter(
+  pdf => !existingPdfs.includes(pdf)
+);
+
+// delete removed files from storage
+await Promise.all([
+  ...removedImages.map(deleteFileByUrl),
+  ...removedPdfs.map(deleteFileByUrl),
+]);
+
+
       const updateData = {
-        name: formData.name.trim(),
-        sku: formData.sku.trim(),
-        price: Number(formData.price),
-        category: formData.category,
-        powerRating: formData.powerRating.trim(),
-        description: formData.description.trim(),
-        specifications: {
-          phase: formData.specifications.phase,
-          voltage: formData.specifications.voltage,
-        },
-        updatedAt: serverTimestamp(),
-      };
+  name: formData.name.trim(),
+  sku: formData.sku.trim(),
+  price: Number(formData.price),
+  category: formData.category,
+  powerRating: formData.powerRating.trim(),
+  description: formData.description.trim(),
+  specifications: {
+    phase: formData.specifications.phase,
+    voltage: formData.specifications.voltage,
+  },
+  galleryImages: [...existingImages, ...newImageUrls],
+  troubleshootingPDFs: [...existingPdfs, ...newPdfUrls],
+  updatedAt: serverTimestamp(),
+};
+
+ 
+
 
       await updateDoc(docRef, updateData);
+
 
       // 🔥 LOG AUDIT: Generator Model Updated
       if (originalData) {
@@ -399,6 +454,92 @@ export default function EditGenerator() {
               </Grid>
             </Grid>
           </Box>
+
+
+          {/* Gallery Images Section */}    
+          <Box sx={{ mb: 4 }}>
+  <h2 className="text-xl font-semibold text-gray-800 mb-2">
+    Gallery Images
+  </h2>
+
+  {/* Existing images */}
+  <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 2 }}>
+    {existingImages.map((img) => (
+      <Box key={img} sx={{ position: "relative" , display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+        <img src={img} width={100} style={{ borderRadius: 8   }} />
+        <Button
+          
+          size="small"
+          color="error"
+          onClick={() =>
+            setExistingImages(prev => prev.filter(i => i !== img))
+          }
+          variant="outlined"
+          
+        >
+          Remove
+        </Button>
+      </Box>
+    ))}
+  </Box>
+
+  {/* New images */}
+  <input
+    type="file"
+    accept="image/*"
+    multiple
+    onChange={(e) =>
+      setNewImageFiles(Array.from(e.target.files || []))
+    }
+    className=" bg-gray-200 rounded-4xl p-2 cursor-pointer "
+  />
+</Box>
+
+
+  {/* Troubleshooting PDFs Section */}
+<Box sx={{ mb: 4 }}>
+  <h2 className="text-xl font-semibold text-gray-800 mb-2">
+    Troubleshooting PDFs
+  </h2>
+
+  {/* Existing PDFs */}
+  <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
+    {existingPdfs.map((pdf) => (
+      <Box key={pdf} sx={{ display: "flex", gap: 1 }}>
+        <a href={pdf} target="_blank" rel="noopener noreferrer"
+        className=" text-indigo-600 border border-indigo-600 px-3 py-1 rounded-2xl hover:bg-indigo-600 hover:text-white transition-colors ">
+          View PDF
+        </a>
+        <Button
+          size="small"
+          color="error"
+          onClick={() =>
+            setExistingPdfs(prev => prev.filter(p => p !== pdf))
+            
+          }
+          className=" px-3 py-1 rounded-2xl border border-red-600 hover:bg-red-600 hover:text-white transition-colors "
+          variant="outlined"
+          
+        >
+          Remove
+        </Button>
+      </Box>
+    ))}
+  </Box>
+
+  {/* New PDFs */}
+  <input
+    type="file"
+    accept="application/pdf"
+    multiple
+    onChange={(e) =>
+      setNewPdfFiles(Array.from(e.target.files || []))
+    }
+    className=" bg-gray-200 rounded-4xl p-2 cursor-pointer "
+  />
+</Box>
+
+
 
           {/* Action Buttons */}
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', pt: 2 }}>

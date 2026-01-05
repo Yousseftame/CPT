@@ -9,6 +9,8 @@ import toast from "react-hot-toast";
 import { ArrowLeft, Save, Zap } from "lucide-react";
 import Grid from '@mui/material/Grid';
 import { auditLogger } from "../../../service/auditLogger";
+import { uploadFiles } from "../../../service/uploadFiles";
+
 
 interface Specifications {
   phase: string;
@@ -23,7 +25,10 @@ interface GeneratorModel {
   powerRating: string;
   description: string;
   specifications: Specifications;
+  galleryImages?: string[];
+  troubleshootingPDFs?: string[];
 }
+
 
 const categories = [
   "Portable",
@@ -52,6 +57,9 @@ export default function AddGenerator() {
       voltage: "",
     },
   });
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+const [pdfFiles, setPdfFiles] = useState<File[]>([]);
+
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -107,6 +115,18 @@ export default function AddGenerator() {
 
     setLoading(true);
 
+
+        // 🔥 Upload files (optional)
+     const galleryImagesUrls =
+      imageFiles.length > 0
+        ? await uploadFiles(imageFiles, "generators/gallery-images")
+        : [];
+
+    const troubleshootingPdfUrls =
+      pdfFiles.length > 0
+        ? await uploadFiles(pdfFiles, "generators/troubleshooting-pdfs")
+        : [];
+
     try {
       const adminUid = auth.currentUser?.uid;
       if (!adminUid) throw new Error('Not authenticated');
@@ -122,8 +142,8 @@ export default function AddGenerator() {
           phase: formData.specifications.phase,
           voltage: formData.specifications.voltage,
         },
-        galleryImages: [],
-        troubleshootingPDFs: [],
+        galleryImages: galleryImagesUrls,
+        troubleshootingPDFs: troubleshootingPdfUrls,
         createdAt: serverTimestamp(),
         createdBy: adminUid,
         updatedAt: serverTimestamp(),
@@ -342,6 +362,54 @@ export default function AddGenerator() {
               </Grid>
             </Grid>
           </Box>
+
+          <Box sx={{ mb: 4 }}>
+  <h2 className="text-xl font-semibold text-gray-800 mb-2">
+    Gallery Images (Optional)
+  </h2>
+
+  <input
+    type="file"
+    accept="image/*"
+    multiple
+    onChange={(e) =>
+      setImageFiles(Array.from(e.target.files || []))
+    }
+        className=" bg-gray-200 rounded-4xl p-2 cursor-pointer "
+
+  />
+
+  {imageFiles.length > 0 && (
+    <p className="text-sm text-gray-500 mt-1">
+      {imageFiles.length} image(s) selected
+    </p>
+  )}
+</Box>
+
+<Box sx={{ mb: 4 }}>
+  <h2 className="text-xl font-semibold text-gray-800 mb-2">
+    Troubleshooting PDFs (Optional)
+  </h2>
+
+  <input
+    type="file"
+    accept="application/pdf"
+    multiple
+    onChange={(e) =>
+      setPdfFiles(Array.from(e.target.files || []))
+    }
+    className=" bg-gray-200 rounded-4xl p-2 cursor-pointer "
+    
+  />
+
+  {pdfFiles.length > 0 && (
+    <p className="text-sm text-gray-500 mt-1">
+      {pdfFiles.length} PDF(s) selected
+    </p>
+  )}
+</Box>
+
+
 
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', pt: 2 }}>
             <Button

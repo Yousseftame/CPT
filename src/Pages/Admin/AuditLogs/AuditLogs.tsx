@@ -35,6 +35,7 @@ const colors = {
   info: "#29B6F6",
   textPrimary: "#263238",
   textSecondary: "#607D8B",
+  textAudit :"#5E35B1",
 };
 
 const actionColors: Record<string, string> = {
@@ -50,7 +51,7 @@ const actionColors: Record<string, string> = {
   REOPENED: colors.warning,
   CLOSED: colors.info,
   COMPLETED: colors.success,
-  LOGIN: colors.success,
+  LOGIN: colors.textAudit,
   LOGOUT: colors.textSecondary,
 };
 
@@ -340,6 +341,7 @@ export default function AuditLogs() {
   }
 
   return (
+    
     <Box sx={{ maxWidth: 1900, mx: "auto", p: { xs: 2, md: 3 }, bgcolor: "#F5F5F5", minHeight: "100vh" }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>

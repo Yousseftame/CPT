@@ -1,4 +1,4 @@
-import { ShieldOff, ArrowLeft, Lock, AlertTriangle, LogOut, Home } from "lucide-react";
+import { ShieldOff, ArrowLeft, Lock, AlertTriangle, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../store/AuthContext/AuthContext";
 import toast from "react-hot-toast";

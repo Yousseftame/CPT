@@ -15,10 +15,11 @@ import {
   arrayUnion,
 } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from '../../service/firebase';
+import { auth, db, functions } from '../../service/firebase';
 import toast from 'react-hot-toast';
 import { auditLogger } from '../../service/auditLogger';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+
 
 
 export interface AdminPermissions {
@@ -96,6 +97,7 @@ interface AdminContextType {
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
+
 
 // Default permissions for new admins
 const getDefaultPermissions = (role: 'admin' | 'superAdmin'): AdminPermissions => {
@@ -307,50 +309,69 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     [fetchAdmins, getAdminById]
   );
 
-  const updateAdminStatus = useCallback(
-    async (id: string, status: 'active' | 'inactive') => {
-      setLoading(true);
-      try {
-        const currentAdminUid = auth.currentUser?.uid;
-        if (!currentAdminUid) throw new Error('Not authenticated');
+ const updateAdminStatus = useCallback(
+  async (id: string, status: 'active' | 'inactive') => {
+    setLoading(true);
+    try {
+      const currentAdminUid = auth.currentUser?.uid;
+      if (!currentAdminUid) throw new Error('Not authenticated');
 
-        // Get before state
-        const before = await getAdminById(id);
+      // Get before state for audit log
+      const before = await getAdminById(id);
 
-        const docRef = doc(db, 'admins', id);
-        await updateDoc(docRef, {
-          status,
-          updatedAt: serverTimestamp(),
-          updatedBy: currentAdminUid,
+      // ✅ Call the cloud function instead of direct Firestore update
+      const updateStatusFunction = httpsCallable(functions, 'updateAdminStatus');
+      const result = await updateStatusFunction({ 
+        uid: id, 
+        status 
+      });
+
+      console.log('Status update result:', result.data);
+
+      // Get after state for audit log
+      const after = await getAdminById(id);
+
+      // 🔥 LOG AUDIT: Status Changed
+      if (before && after) {
+        await auditLogger.log({
+          action: status === 'active' ? 'ENABLED_ADMIN' : 'DISABLED_ADMIN',
+          entityType: 'admin',
+          entityId: id,
+          entityName: after.name,
+          before: { status: before.status },
+          after: { status: after.status },
         });
-
-        // Get after state
-        const after = await getAdminById(id);
-
-        // 🔥 LOG AUDIT: Status Changed
-        if (before && after) {
-          await auditLogger.log({
-            action: status === 'active' ? 'ENABLED_ADMIN' : 'DISABLED_ADMIN',
-            entityType: 'admin',
-            entityId: id,
-            entityName: after.name,
-            before: { status: before.status },
-            after: { status: after.status },
-          });
-        }
-
-        toast.success(`Admin ${status === 'active' ? 'enabled' : 'disabled'} successfully!`);
-        await fetchAdmins();
-      } catch (error) {
-        console.error('Error updating admin status:', error);
-        toast.error('Failed to update admin status');
-        throw error;
-      } finally {
-        setLoading(false);
       }
-    },
-    [fetchAdmins, getAdminById]
-  );
+
+      toast.success(
+        status === 'active' 
+          ? 'Admin account activated successfully' 
+          : 'Admin account deactivated successfully'
+      );
+      
+      // Refresh the admins list to reflect changes
+      await fetchAdmins();
+    } catch (error: any) {
+      console.error('Error updating admin status:', error);
+      
+      // Handle specific Firebase Functions error codes
+      if (error.code === 'functions/permission-denied') {
+        toast.error("You don't have permission to change your  status");
+      } else if (error.code === 'functions/unauthenticated') {
+        toast.error("You must be logged in to perform this action");
+      } else if (error.code === 'functions/invalid-argument') {
+        toast.error(error.message || "Invalid request data");
+      } else {
+        toast.error(error.message || 'Failed to update admin status');
+      }
+      
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  },
+  [fetchAdmins, getAdminById]
+);
 
   const updateAdminRole = useCallback(
     async (id: string, role: 'admin' | 'superAdmin') => {
@@ -429,7 +450,6 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       });
 
       // Get functions instance
-      const functions = getFunctions();
       const deleteAdminAccount = httpsCallable(functions, 'deleteAdminAccount');
       
       // ✅ Call the cloud function with the correct data structure

@@ -8,8 +8,9 @@ setGlobalOptions({
 });
 
 // Export the function
-export { deleteAdminAccount } from './deleteAdmin';
+export { deleteAdminAccount } from './admin/deleteAdmin';
 export { deleteCustomerAccount } from './customer/deleteCustomerAccount';
+export { updateAdminStatus } from './admin/updateAdminStatus';
 
 
 // If you have other functions, export them here too

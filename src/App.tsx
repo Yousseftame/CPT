@@ -7,7 +7,6 @@ import MasterLayout from "./layouts/MasterLayout/MasterLayout";
 import Dashboard from "./Pages/Dashbaord/Dashboard";
 import { Toaster } from "react-hot-toast";
 import ResetPassword from "./Pages/Auth/ResetPassword/ResetPassword";
-import Request from "./Pages/Admin/Request/Request";
 import Register from "./Pages/Auth/Register/Register";
 import VerifyAccount from "./Pages/Auth/VerifyAccount/VerifyAccount";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
@@ -85,7 +84,6 @@ function App() {
         { path: "/models/edit/:id", element: <EditGenerator /> },
 
         // Request routes
-        { path: "request", element: <Request /> },
         { path: "/requests", element: <PurchaseRequests /> },
         { path: "/requests/:id", element: <RequestDetails /> },
 

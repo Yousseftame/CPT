@@ -32,15 +32,34 @@ const Login = () => {
       const docRef = doc(db, "admins", userCredential.user.uid);
       const docSnap = await getDoc(docRef);
       
-      if (docSnap.exists()) {
-        localStorage.setItem('userRole', docSnap.data().role);
-        localStorage.setItem('userName', docSnap.data().name || '');
+      
+      if (!docSnap.exists()) {
+        setError('Admin account not found.');
+        await signOut(auth);
+        return;
       }
 
+      const adminData = docSnap.data();
+      
+      // Store admin data
+      localStorage.setItem('userRole', adminData.role);
+      localStorage.setItem('userName', adminData.name || '');
+      localStorage.setItem('userStatus', adminData.status || 'active');
+
+      // Check if email is verified
       if (!currentUser?.emailVerified) {
         setError('Please verify your email before logging in.');
         navigate('/verify-account');
         toast.error('Please verify your email first.');
+        await signOut(auth);
+        return;
+      }
+
+      // Check if admin account is active
+      if (adminData.status === 'inactive') {
+        setError('Your account has been deactivated. Please contact a super admin.');
+        toast.error('Account is inactive. Access denied.');
+        await signOut(auth);
         return;
       }
 
@@ -51,7 +70,10 @@ const Login = () => {
       navigate('/dashboard');
 
     } catch (err: any) {
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+      // Handle Firebase Auth errors
+      if (err.code === 'auth/user-disabled') {
+        navigate('/unauthorized');
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
         setError('Invalid email or password. Please try again.');
       } else if (err.code === 'auth/user-not-found') {
         setError('No account found with this email.');
@@ -62,6 +84,8 @@ const Login = () => {
       } else {
         setError('Failed to login. Please check your credentials.');
       }
+      
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }
@@ -159,7 +183,6 @@ const Login = () => {
           type="button"
           className="text-purple-600  font-bold transition-all duration-300 disabled:opacity-50  underline-offset-4"
           disabled
-          
         >
           Create Account
         </button>

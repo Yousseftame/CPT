@@ -3,14 +3,16 @@ import { storage } from "./firebase";
 
 export const uploadFiles = async (
   files: File[],
-  folder: string
+  generatorId: string,
+  folder: "gallery-images" | "troubleshooting-pdfs"
 ): Promise<string[]> => {
   const urls: string[] = [];
 
   for (const file of files) {
+    // New path: generators/:generatorId/gallery-images or generators/:generatorId/troubleshooting-pdfs
     const fileRef = ref(
       storage,
-      `${folder}/${Date.now()}-${file.name}`
+      `generators/${generatorId}/${folder}/${Date.now()}-${file.name}`
     );
 
     await uploadBytes(fileRef, file);

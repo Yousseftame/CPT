@@ -2,7 +2,7 @@
 
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { TextField, Button, Paper, Divider, Box } from "@mui/material";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../../service/firebase";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -58,8 +58,7 @@ export default function AddGenerator() {
     },
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
-const [pdfFiles, setPdfFiles] = useState<File[]>([]);
-
+  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -115,22 +114,11 @@ const [pdfFiles, setPdfFiles] = useState<File[]>([]);
 
     setLoading(true);
 
-
-        // 🔥 Upload files (optional)
-     const galleryImagesUrls =
-      imageFiles.length > 0
-        ? await uploadFiles(imageFiles, "generators/gallery-images")
-        : [];
-
-    const troubleshootingPdfUrls =
-      pdfFiles.length > 0
-        ? await uploadFiles(pdfFiles, "generators/troubleshooting-pdfs")
-        : [];
-
     try {
       const adminUid = auth.currentUser?.uid;
       if (!adminUid) throw new Error('Not authenticated');
 
+      // 🔥 Create Firestore document FIRST to get the generatorId
       const docData = {
         name: formData.name.trim(),
         sku: formData.sku.trim(),
@@ -142,32 +130,54 @@ const [pdfFiles, setPdfFiles] = useState<File[]>([]);
           phase: formData.specifications.phase,
           voltage: formData.specifications.voltage,
         },
-        galleryImages: galleryImagesUrls,
-        troubleshootingPDFs: troubleshootingPdfUrls,
+        galleryImages: [],
+        troubleshootingPDFs: [],
         createdAt: serverTimestamp(),
         createdBy: adminUid,
         updatedAt: serverTimestamp(),
       };
 
       const docRef = await addDoc(collection(db, "generatorModels"), docData);
-      
-      console.log("Document written with ID: ", docRef.id);
+      const generatorId = docRef.id;
+
+      console.log("Document written with ID: ", generatorId);
+
+      // 🔥 NOW upload files with the generatorId in the path
+      const galleryImagesUrls = imageFiles.length > 0
+        ? await uploadFiles(imageFiles, generatorId, "gallery-images")
+        : [];
+
+      const troubleshootingPdfUrls = pdfFiles.length > 0
+        ? await uploadFiles(pdfFiles, generatorId, "troubleshooting-pdfs")
+        : [];
+
+      // 🔥 Update the document with the file URLs
+      if (galleryImagesUrls.length > 0 || troubleshootingPdfUrls.length > 0) {
+        await updateDoc(docRef, {
+          galleryImages: galleryImagesUrls,
+          troubleshootingPDFs: troubleshootingPdfUrls,
+        });
+      }
 
       // 🔥 LOG AUDIT: Generator Model Created
       await auditLogger.log({
         action: "CREATED_GENERATOR_MODEL",
         entityType: "generator",
-        entityId: docRef.id,
+        entityId: generatorId,
         entityName: formData.name.trim(),
-        after: docData,
+        after: {
+          ...docData,
+          galleryImages: galleryImagesUrls,
+          troubleshootingPDFs: troubleshootingPdfUrls,
+        },
       });
 
       toast.success("Generator model added successfully!");
-      
+
       setTimeout(() => {
         navigate("/models");
       }, 500);
-      
+
     } catch (error: any) {
       console.error("Error adding document: ", error);
       toast.error(error.message || "Failed to add generator model");
@@ -177,13 +187,13 @@ const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, md: 3 } }}>
+    <Box sx={{ maxWidth: 1600, mx: 'auto', p: { xs: 2, md: 3 } }}>
       <Box sx={{ mb: 4 }}>
         <Button
           variant="outlined"
           startIcon={<ArrowLeft size={20} />}
           onClick={() => navigate("/models")}
-          sx={{ 
+          sx={{
             textTransform: 'none',
             mb: 2,
             borderRadius: 2
@@ -191,7 +201,7 @@ const [pdfFiles, setPdfFiles] = useState<File[]>([]);
         >
           Back to Models
         </Button>
-     
+
         <Box>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Add Generator Model</h1>
           <p className="text-gray-600">Create a new generator model entry</p>
@@ -200,14 +210,14 @@ const [pdfFiles, setPdfFiles] = useState<File[]>([]);
 
       <Paper elevation={0} sx={{ p: { xs: 3, md: 4 }, border: '1px solid', borderColor: 'grey.200', borderRadius: 3 }}>
         <form onSubmit={handleSubmit}>
-          
+
           <Box sx={{ mb: 5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
               <Zap className="text-indigo-600" size={24} />
               <h2 className="text-xl font-semibold text-gray-800">Basic Information</h2>
             </Box>
             <Divider sx={{ mb: 4 }} />
-            
+
             <Grid container spacing={3}>
               <Grid size={{ xs: 12, md: 6 }}>
                 <TextField
@@ -364,55 +374,48 @@ const [pdfFiles, setPdfFiles] = useState<File[]>([]);
           </Box>
 
           <Box sx={{ mb: 4 }}>
-            
-  <h2 className="text-xl font-semibold text-gray-800 mb-2">
-    
-    Gallery Images (Optional)
-  </h2>
-  
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+              Gallery Images (Optional)
+            </h2>
 
-  <input
-    type="file"
-    accept="image/*"
-    multiple
-    onChange={(e) =>
-      setImageFiles(Array.from(e.target.files || []))
-    }
-        className=" bg-gray-200 rounded-4xl p-2 cursor-pointer "
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) =>
+                setImageFiles(Array.from(e.target.files || []))
+              }
+              className="bg-gray-200 rounded-4xl p-2 cursor-pointer"
+            />
 
-  />
+            {imageFiles.length > 0 && (
+              <p className="text-sm text-gray-500 mt-1">
+                {imageFiles.length} image(s) selected
+              </p>
+            )}
+          </Box>
 
-  {imageFiles.length > 0 && (
-    <p className="text-sm text-gray-500 mt-1">
-      {imageFiles.length} image(s) selected
-    </p>
-  )}
-</Box>
+          <Box sx={{ mb: 4 }}>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+              Troubleshooting PDFs (Optional)
+            </h2>
 
-<Box sx={{ mb: 4 }}>
-  <h2 className="text-xl font-semibold text-gray-800 mb-2">
-    Troubleshooting PDFs (Optional)
-  </h2>
+            <input
+              type="file"
+              accept="application/pdf"
+              multiple
+              onChange={(e) =>
+                setPdfFiles(Array.from(e.target.files || []))
+              }
+              className="bg-gray-200 rounded-4xl p-2 cursor-pointer"
+            />
 
-  <input
-    type="file"
-    accept="application/pdf"
-    multiple
-    onChange={(e) =>
-      setPdfFiles(Array.from(e.target.files || []))
-    }
-    className=" bg-gray-200 rounded-4xl p-2 cursor-pointer "
-    
-  />
-
-  {pdfFiles.length > 0 && (
-    <p className="text-sm text-gray-500 mt-1">
-      {pdfFiles.length} PDF(s) selected
-    </p>
-  )}
-</Box>
-
-
+            {pdfFiles.length > 0 && (
+              <p className="text-sm text-gray-500 mt-1">
+                {pdfFiles.length} PDF(s) selected
+              </p>
+            )}
+          </Box>
 
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', pt: 2 }}>
             <Button

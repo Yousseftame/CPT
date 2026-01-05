@@ -11,6 +11,13 @@ setGlobalOptions({
 export { deleteAdminAccount } from './admin/deleteAdmin';
 export { deleteCustomerAccount } from './customer/deleteCustomerAccount';
 export { updateAdminStatus } from './admin/updateAdminStatus';
+import { serveFile } from "./functions/serveFile";
+import * as admin from "firebase-admin";
+
+// Initialize Firebase Admin SDK
+admin.initializeApp();
+
+export { serveFile };
 
 
 // If you have other functions, export them here too

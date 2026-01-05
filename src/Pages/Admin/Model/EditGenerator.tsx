@@ -61,18 +61,16 @@ export default function EditGenerator() {
     },
   });
   // existing files from firestore
-const [existingImages, setExistingImages] = useState<string[]>([]);
-const [existingPdfs, setExistingPdfs] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [existingPdfs, setExistingPdfs] = useState<string[]>([]);
 
-// new selected files
-const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
-const [newPdfFiles, setNewPdfFiles] = useState<File[]>([]);
+  // new selected files
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [newPdfFiles, setNewPdfFiles] = useState<File[]>([]);
 
-//  original files for comparison 
-const [originalImages, setOriginalImages] = useState<string[]>([]);
-const [originalPdfs, setOriginalPdfs] = useState<string[]>([]);
-
-  
+  //  original files for comparison
+  const [originalImages, setOriginalImages] = useState<string[]>([]);
+  const [originalPdfs, setOriginalPdfs] = useState<string[]>([]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -168,53 +166,47 @@ const [originalPdfs, setOriginalPdfs] = useState<string[]>([]);
     try {
       const docRef = doc(db, "generatorModels", id);
 
+      // 🔥 Upload new files with generatorId in the path
+      const newImageUrls = newImageFiles.length
+        ? await uploadFiles(newImageFiles, id, "gallery-images")
+        : [];
 
-           // upload new files
-const newImageUrls = newImageFiles.length
-  ? await uploadFiles(newImageFiles, "generators/gallery-images")
-  : [];
+      const newPdfUrls = newPdfFiles.length
+        ? await uploadFiles(newPdfFiles, id, "troubleshooting-pdfs")
+        : [];
 
-const newPdfUrls = newPdfFiles.length
-  ? await uploadFiles(newPdfFiles, "generators/troubleshooting-pdfs")
-  : [];
+      // 🔥 Detect removed files
+      const removedImages = originalImages.filter(
+        img => !existingImages.includes(img)
+      );
 
-// detect removed files
-const removedImages = originalImages.filter(
-  img => !existingImages.includes(img)
-);
+      const removedPdfs = originalPdfs.filter(
+        pdf => !existingPdfs.includes(pdf)
+      );
 
-const removedPdfs = originalPdfs.filter(
-  pdf => !existingPdfs.includes(pdf)
-);
-
-// delete removed files from storage
-await Promise.all([
-  ...removedImages.map(deleteFileByUrl),
-  ...removedPdfs.map(deleteFileByUrl),
-]);
-
+      // 🔥 Delete removed files from storage
+      await Promise.all([
+        ...removedImages.map(deleteFileByUrl),
+        ...removedPdfs.map(deleteFileByUrl),
+      ]);
 
       const updateData = {
-  name: formData.name.trim(),
-  sku: formData.sku.trim(),
-  price: Number(formData.price),
-  category: formData.category,
-  powerRating: formData.powerRating.trim(),
-  description: formData.description.trim(),
-  specifications: {
-    phase: formData.specifications.phase,
-    voltage: formData.specifications.voltage,
-  },
-  galleryImages: [...existingImages, ...newImageUrls],
-  troubleshootingPDFs: [...existingPdfs, ...newPdfUrls],
-  updatedAt: serverTimestamp(),
-};
-
- 
-
+        name: formData.name.trim(),
+        sku: formData.sku.trim(),
+        price: Number(formData.price),
+        category: formData.category,
+        powerRating: formData.powerRating.trim(),
+        description: formData.description.trim(),
+        specifications: {
+          phase: formData.specifications.phase,
+          voltage: formData.specifications.voltage,
+        },
+        galleryImages: [...existingImages, ...newImageUrls],
+        troubleshootingPDFs: [...existingPdfs, ...newPdfUrls],
+        updatedAt: serverTimestamp(),
+      };
 
       await updateDoc(docRef, updateData);
-
 
       // 🔥 LOG AUDIT: Generator Model Updated
       if (originalData) {
@@ -256,19 +248,19 @@ await Promise.all([
 
   if (fetchLoading) {
     return (
-       <PagesLoader text="Loading generator model data..." />
+      <PagesLoader text="Loading generator model data..." />
     );
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, md: 3 } }}>
+    <Box sx={{ maxWidth: 1600, mx: 'auto', p: { xs: 2, md: 3 } }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Button
           variant="outlined"
           startIcon={<ArrowLeft size={20} />}
           onClick={() => navigate("/models")}
-          sx={{ 
+          sx={{
             textTransform: 'none',
             mb: 2,
             borderRadius: 2
@@ -284,7 +276,7 @@ await Promise.all([
 
       <Paper elevation={0} sx={{ p: { xs: 3, md: 4 }, border: '1px solid', borderColor: 'grey.200', borderRadius: 3 }}>
         <form onSubmit={handleSubmit}>
-          
+
           {/* Basic Information Section */}
           <Box sx={{ mb: 5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
@@ -292,7 +284,7 @@ await Promise.all([
               <h2 className="text-xl font-semibold text-gray-800">Basic Information</h2>
             </Box>
             <Divider sx={{ mb: 4 }} />
-            
+
             <Grid container spacing={3}>
               <Grid size={{ xs: 12, md: 6 }}>
                 <TextField
@@ -456,88 +448,84 @@ await Promise.all([
           </Box>
 
 
-          {/* Gallery Images Section */}    
+          {/* Gallery Images Section */}
           <Box sx={{ mb: 4 }}>
-  <h2 className="text-xl font-semibold text-gray-800 mb-2">
-    Gallery Images
-  </h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+              Gallery Images
+            </h2>
 
-  {/* Existing images */}
-  <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 2 }}>
-    {existingImages.map((img) => (
-      <Box key={img} sx={{ position: "relative" , display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-        <img src={img} width={100} style={{ borderRadius: 8   }} />
-        <Button
-          
-          size="small"
-          color="error"
-          onClick={() =>
-            setExistingImages(prev => prev.filter(i => i !== img))
-          }
-          variant="outlined"
-          
-        >
-          Remove
-        </Button>
-      </Box>
-    ))}
-  </Box>
+            {/* Existing images */}
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 2 }}>
+              {existingImages.map((img) => (
+                <Box key={img} sx={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+                  <img src={img} width={100} style={{ borderRadius: 8 }} />
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={() =>
+                      setExistingImages(prev => prev.filter(i => i !== img))
+                    }
+                    variant="outlined"
+                  >
+                    Remove
+                  </Button>
+                </Box>
+              ))}
+            </Box>
 
-  {/* New images */}
-  <input
-    type="file"
-    accept="image/*"
-    multiple
-    onChange={(e) =>
-      setNewImageFiles(Array.from(e.target.files || []))
-    }
-    className=" bg-gray-200 rounded-4xl p-2 cursor-pointer "
-  />
-</Box>
+            {/* New images */}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) =>
+                setNewImageFiles(Array.from(e.target.files || []))
+              }
+              className="bg-gray-200 rounded-4xl p-2 cursor-pointer"
+            />
+          </Box>
 
 
-  {/* Troubleshooting PDFs Section */}
-<Box sx={{ mb: 4 }}>
-  <h2 className="text-xl font-semibold text-gray-800 mb-2">
-    Troubleshooting PDFs
-  </h2>
+          {/* Troubleshooting PDFs Section */}
+          <Box sx={{ mb: 4 }}>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+              Troubleshooting PDFs
+            </h2>
 
-  {/* Existing PDFs */}
-  <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
-    {existingPdfs.map((pdf) => (
-      <Box key={pdf} sx={{ display: "flex", gap: 1 }}>
-        <a href={pdf} target="_blank" rel="noopener noreferrer"
-        className=" text-indigo-600 border border-indigo-600 px-3 py-1 rounded-2xl hover:bg-indigo-600 hover:text-white transition-colors ">
-          View PDF
-        </a>
-        <Button
-          size="small"
-          color="error"
-          onClick={() =>
-            setExistingPdfs(prev => prev.filter(p => p !== pdf))
-            
-          }
-          className=" px-3 py-1 rounded-2xl border border-red-600 hover:bg-red-600 hover:text-white transition-colors "
-          variant="outlined"
-          
-        >
-          Remove
-        </Button>
-      </Box>
-    ))}
-  </Box>
+            {/* Existing PDFs */}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
+              {existingPdfs.map((pdf) => (
+                <Box key={pdf} sx={{ display: "flex", gap: 1 }}>
+                  <a href={pdf} target="_blank" rel="noopener noreferrer"
+                    className="text-indigo-600 border border-indigo-600 px-3 py-1 rounded-2xl hover:bg-indigo-600 hover:text-white transition-colors">
+                    View PDF
+                  </a>
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={() =>
+                      setExistingPdfs(prev => prev.filter(p => p !== pdf))
+                    }
+                    className="px-3 py-1 rounded-2xl border border-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                    variant="outlined"
+                  >
+                    Remove
+                  </Button>
+                </Box>
+              ))}
+            </Box>
 
-  {/* New PDFs */}
-  <input
-    type="file"
-    accept="application/pdf"
-    multiple
-    onChange={(e) =>
-      setNewPdfFiles(Array.from(e.target.files || []))
-    }
-    className=" bg-gray-200 rounded-4xl p-2 cursor-pointer "
-  />
-</Box>
+            {/* New PDFs */}
+            <input
+              type="file"
+              accept="application/pdf"
+              multiple
+              onChange={(e) =>
+                setNewPdfFiles(Array.from(e.target.files || []))
+              }
+              className="bg-gray-200 rounded-4xl p-2 cursor-pointer"
+            />
+          </Box>
 
 
 
@@ -547,9 +535,9 @@ await Promise.all([
               variant="outlined"
               onClick={() => navigate("/models")}
               disabled={loading}
-              sx={{ 
-                textTransform: 'none', 
-                px: 4, 
+              sx={{
+                textTransform: 'none',
+                px: 4,
                 py: 1.5,
                 borderRadius: 2
               }}

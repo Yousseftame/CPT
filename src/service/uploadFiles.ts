@@ -1,5 +1,5 @@
 // src/service/uploadFiles.ts
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes } from "firebase/storage";
 import { storage } from "./firebase";
 import { getSecureFileUrl } from "./secureFileUrl";
 

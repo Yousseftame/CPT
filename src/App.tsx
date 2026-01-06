@@ -7,7 +7,6 @@ import MasterLayout from "./layouts/MasterLayout/MasterLayout";
 import Dashboard from "./Pages/Dashbaord/Dashboard";
 import { Toaster } from "react-hot-toast";
 import ResetPassword from "./Pages/Auth/ResetPassword/ResetPassword";
-import Register from "./Pages/Auth/Register/Register";
 import VerifyAccount from "./Pages/Auth/VerifyAccount/VerifyAccount";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
 import Unauthorized from "./Pages/Unauthorized/Unauthorized";
@@ -40,7 +39,7 @@ function App() {
       children: [
         { index: true, element: <Login /> },
         { path: "login", element: <Login /> },
-        { path: "register", element: <Register /> },
+        // { path: "register", element: <Register /> },
         { path: "reset-password", element: <ResetPassword /> },
         { path: "forget-password", element: <ForgetPassword /> },
         { path: "verify-account", element: <VerifyAccount /> },
@@ -53,13 +52,17 @@ function App() {
     {
       path: "",
       element: (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={["admin", "superAdmin"]}>
           <MasterLayout />
         </ProtectedRoute>
       ),
       errorElement: <NotFound />,
       children: [
-        { index: true, element: <Dashboard /> },
+        { index: true, element:   (
+            <ProtectedRoute allowedRoles={["admin", "superAdmin"]}>
+              <Dashboard />
+            </ProtectedRoute>
+          ) },
         {
           path: "dashboard", 
           element: (
@@ -103,9 +106,11 @@ function App() {
             
           )
         },
-        { path: "/admins/create", element: <CreateAdmin /> },
-        { path: "/admins/:id", element: <AdminDetails /> },
-        { path: "/admins/:id/edit", element: <EditAdmin /> },
+        { path: "/admins/create", element: <ProtectedRoute allowedRoles={["superAdmin"]}><CreateAdmin /></ProtectedRoute> },
+        { path: "/admins/:id", element: <ProtectedRoute allowedRoles={["superAdmin"]}><AdminDetails /></ProtectedRoute> },
+        { path: "/admins/:id/edit", element: <ProtectedRoute allowedRoles={["superAdmin"]}><EditAdmin /></ProtectedRoute> },
+
+          // Audit Logs (Super Admin only)
         { path: "audit-logs", element:<ProtectedRoute allowedRoles={["superAdmin"]}><AuditLogs /></ProtectedRoute> }
        
 

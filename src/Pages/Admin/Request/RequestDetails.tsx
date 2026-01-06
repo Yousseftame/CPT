@@ -1,15 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  arrayUnion,
-  collection,
-  getDocs,
-  query,
-  orderBy,
-} from "firebase/firestore";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "../../../service/firebase";
 import {
   Button,
@@ -24,10 +15,10 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
-  Select,
-  MenuItem,
   FormControl,
   InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import {
   ArrowLeft,
@@ -48,9 +39,8 @@ import {
   AlertTriangle,
   Check,
 } from "lucide-react";
-import toast from "react-hot-toast";
 import PagesLoader from "../../../components/shared/PagesLoader";
-import { auditLogger } from "../../../service/auditLogger";
+import { useRequest } from "../../../store/MasterContext/RequestContext";
 
 const colors = {
   primary: "#5E35B1",
@@ -74,21 +64,19 @@ interface GeneratorModel {
   sku: string;
 }
 
-interface AssignedUnit {
-  modelId: string;
-  serial: string;
-  assignedAt: string;
-}
-
-interface InternalNote {
-  note: string;
-  createdAt: string;
-  createdBy: string;
-}
-
 export default function RequestDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const {
+    getRequestById,
+    updateRequestStatus,
+    assignUnit,
+    addInternalNote,
+    updateAssignedUnit,
+    removeAssignedUnit,
+    removeInternalNote,
+  } = useRequest();
+
   const [request, setRequest] = useState<any>(null);
   const [models, setModels] = useState<GeneratorModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,21 +98,14 @@ export default function RequestDetails() {
 
   const fetchRequest = async () => {
     if (!id) return;
-    
 
     try {
-      const docRef = doc(db, "purchaseRequests", id);
-      const snapshot = await getDoc(docRef);
-
-      if (snapshot.exists()) {
-        setRequest({ id: snapshot.id, ...snapshot.data() });
+      const data = await getRequestById(id);
+      if (data) {
+        setRequest(data);
       } else {
-        toast.error("Request not found");
         navigate("/requests");
       }
-    } catch (error) {
-      console.error("Error fetching request:", error);
-      toast.error("Failed to load request details");
     } finally {
       setLoading(false);
     }
@@ -152,168 +133,61 @@ export default function RequestDetails() {
 
   const handleStatusChange = async (newStatus: string) => {
     if (!id) return;
-
-    try {
-      const docRef = doc(db, "purchaseRequests", id);
-      await updateDoc(docRef, {
-        status: newStatus,
-        [`${newStatus}At`]: new Date().toISOString(),
-      });
-      toast.success(`Status updated to ${newStatus}`);
-      fetchRequest();
-    } catch (error) {
-      console.error("Error updating status:", error);
-      toast.error("Failed to update status");
-    }
+    await updateRequestStatus(id, newStatus as any);
+    fetchRequest();
   };
 
   const handleAssignUnit = async () => {
-    if (!selectedModel || !serialNumber.trim()) {
-      toast.error("Please select a model and enter a serial number");
-      return;
-     
-    }
-    
-setDisabled(true);
+    if (!selectedModel || !serialNumber.trim()) return;
+    setDisabled(true);
     try {
-      const docRef = doc(db, "purchaseRequests", id!);
-      await updateDoc(docRef, {
-        assignedUnits: arrayUnion({
-          modelId: selectedModel,
-          serial: serialNumber,
-          assignedAt: new Date().toISOString(),
-        }),
-      });
-      
-      const modelDoc = await getDoc(doc(db, "generatorModels", selectedModel));
-      const modelName = modelDoc.exists() ? modelDoc.data().name : selectedModel;
-
-      // 🔥 LOG AUDIT: Unit Assigned to Request
-      await auditLogger.log({
-              action: "ASSIGNED_UNIT_TO_REQUEST",
-              entityType: "purchaseRequest",
-              entityId: request.id,
-              entityName: `Request from ${request.customerName || "Unknown"}`,
-              after: {
-                unit: {
-                  modelId: selectedModel,
-                  modelName: modelName,
-                  serial: serialNumber,
-                }
-              },
-            });
-
-      toast.success("Unit assigned successfully!");
+      await assignUnit(id!, { modelId: selectedModel, serial: serialNumber });
       setAssignDialog(false);
       setSelectedModel("");
       setSerialNumber("");
       fetchRequest();
-    } catch (error) {
-      console.error("Error assigning unit:", error);
-      toast.error("Failed to assign unit");
-    }
-    finally {
+    } finally {
       setDisabled(false);
     }
   };
 
   const handleAddNote = async () => {
-    if (!noteText.trim()) {
-      toast.error("Please enter a note");
-      return;
-    }
+    if (!noteText.trim()) return;
     setDisabled(true);
-
     try {
-      const docRef = doc(db, "purchaseRequests", id!);
-      await updateDoc(docRef, {
-        internalNotes: arrayUnion({
-          note: noteText,
-          createdAt: new Date().toISOString(),
-          createdBy: "Admin", // Replace with actual user name
-        }),
-      });
-      // 🔥 LOG AUDIT: Note Added to Request
-            await auditLogger.log({
-              action: "ADDED_REQUEST_NOTE",
-              entityType: "purchaseRequest",
-              entityId: request.id,
-              entityName: `Request from ${request.customerName || "Unknown"}`,
-              after: {
-                note: noteText.substring(0, 100) + (noteText.length > 100 ? "..." : "")
-              },
-            });
-
-      toast.success("Note added successfully!");
+      await addInternalNote(id!, noteText);
       setNoteDialog(false);
       setNoteText("");
       fetchRequest();
-    } catch (error) {
-      console.error("Error adding note:", error);
-      toast.error("Failed to add note");
-    }
-    finally { 
+    } finally {
       setDisabled(false);
-     }
+    }
   };
 
   const handleEditUnit = async () => {
-    if (!selectedModel || !serialNumber.trim() || selectedUnitIndex === -1) {
-      toast.error("Please select a model and enter a serial number");
-      return;
-    }
+    if (!selectedModel || !serialNumber.trim() || selectedUnitIndex === -1) return;
     setDisabled(true);
-
     try {
-      const updatedUnits = [...request.assignedUnits];
-      updatedUnits[selectedUnitIndex] = {
-        modelId: selectedModel,
-        serial: serialNumber,
-        assignedAt: updatedUnits[selectedUnitIndex].assignedAt,
-      };
-
-      const docRef = doc(db, "purchaseRequests", id!);
-      await updateDoc(docRef, {
-        assignedUnits: updatedUnits,
-      });
-
-      toast.success("Unit updated successfully!");
+      await updateAssignedUnit(id!, selectedUnitIndex, { modelId: selectedModel, serial: serialNumber });
       setEditUnitDialog(false);
       setSelectedModel("");
       setSerialNumber("");
       setSelectedUnitIndex(-1);
       fetchRequest();
-    } catch (error) {
-      console.error("Error updating unit:", error);
-      toast.error("Failed to update unit");
-    }
-    finally {
+    } finally {
       setDisabled(false);
     }
   };
 
   const handleDeleteUnit = async () => {
     if (selectedUnitIndex === -1) return;
-   setDisabled(true);
+    setDisabled(true);
     try {
-      const updatedUnits = request.assignedUnits.filter(
-        (_: any, index: number) => index !== selectedUnitIndex
-      );
-
-      const docRef = doc(db, "purchaseRequests", id!);
-      await updateDoc(docRef, {
-        assignedUnits: updatedUnits,
-      });
-
-      toast.success("Unit removed successfully!");
+      await removeAssignedUnit(id!, selectedUnitIndex);
       setDeleteUnitDialog(false);
       setSelectedUnitIndex(-1);
       fetchRequest();
-    } catch (error) {
-      console.error("Error removing unit:", error);
-      toast.error("Failed to remove unit");
-    }
-    finally {
+    } finally {
       setDisabled(false);
     }
   };
@@ -322,29 +196,16 @@ setDisabled(true);
     if (selectedNoteIndex === -1) return;
     setDisabled(true);
     try {
-      const updatedNotes = request.internalNotes.filter(
-        (_: any, index: number) => index !== selectedNoteIndex
-      );
-
-      const docRef = doc(db, "purchaseRequests", id!);
-      await updateDoc(docRef, {
-        internalNotes: updatedNotes,
-      });
-
-      toast.success("Note deleted successfully!");
+      await removeInternalNote(id!, selectedNoteIndex);
       setDeleteNoteDialog(false);
       setSelectedNoteIndex(-1);
       fetchRequest();
-    } catch (error) {
-      console.error("Error deleting note:", error);
-      toast.error("Failed to delete note");
-    }
-    finally { 
+    } finally {
       setDisabled(false);
     }
   };
 
-  const openEditUnitDialog = (unit: AssignedUnit, index: number) => {
+  const openEditUnitDialog = (unit: any, index: number) => {
     setSelectedUnitIndex(index);
     setSelectedModel(unit.modelId);
     setSerialNumber(unit.serial);
@@ -370,8 +231,6 @@ setDisabled(true);
     const model = models.find((m) => m.id === modelId);
     return model?.sku || "N/A";
   };
-
-  
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -684,7 +543,7 @@ setDisabled(true);
               </div>
             ) : (
               <div className="space-y-3">
-                {request.assignedUnits.map((unit: AssignedUnit, index: number) => (
+                {request.assignedUnits.map((unit: any, index: number) => (
                   <div
                     key={index}
                     className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
@@ -768,7 +627,7 @@ setDisabled(true);
               </div>
             ) : (
               <div className="space-y-3">
-                {request.internalNotes.map((note: InternalNote, index: number) => (
+                {request.internalNotes.map((note: any, index: number) => (
                   <div
                     key={index}
                     className="border border-gray-200 rounded-lg p-4 bg-amber-50 hover:bg-amber-100 transition-colors"
@@ -777,7 +636,7 @@ setDisabled(true);
                       <div className="flex-1">
                         <p className="text-gray-800 mb-2">{note.note}</p>
                         <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span className="font-medium">{note.createdBy}</span>
+                          <span className="font-medium">{note.createdByName || note.createdBy}</span>
                           <span>•</span>
                           <span>{formatDate(note.createdAt)}</span>
                         </div>
@@ -798,7 +657,7 @@ setDisabled(true);
         </Box>
       </Box>
 
-      {/* Assign Unit Dialog */}
+      {/* Dialogs */}
       <Dialog open={assignDialog} onClose={() => setAssignDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
           <div className="flex items-center gap-2">
@@ -853,7 +712,6 @@ setDisabled(true);
         </DialogActions>
       </Dialog>
 
-      {/* Add Note Dialog */}
       <Dialog open={noteDialog} onClose={() => setNoteDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
           <div className="flex items-center gap-2">
@@ -893,7 +751,6 @@ setDisabled(true);
         </DialogActions>
       </Dialog>
 
-      {/* Edit Unit Dialog */}
       <Dialog open={editUnitDialog} onClose={() => setEditUnitDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
           <div className="flex items-center gap-2">
@@ -946,7 +803,6 @@ setDisabled(true);
         </DialogActions>
       </Dialog>
 
-      {/* Delete Unit Dialog */}
       <Dialog open={deleteUnitDialog} onClose={() => setDeleteUnitDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle className="text-red-600">
           <div className="flex items-center gap-2">
@@ -980,7 +836,6 @@ setDisabled(true);
         </DialogActions>
       </Dialog>
 
-      {/* Delete Note Dialog */}
       <Dialog open={deleteNoteDialog} onClose={() => setDeleteNoteDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle className="text-red-600">
           <div className="flex items-center gap-2">

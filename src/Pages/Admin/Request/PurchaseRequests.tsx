@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
-import { db } from "../../../service/firebase";
 import {
   Button,
   Chip,
@@ -9,9 +7,6 @@ import {
   TextField,
   InputAdornment,
   IconButton,
-  Select,
-  MenuItem,
-  FormControl,
   Avatar,
 } from "@mui/material";
 import {
@@ -23,7 +18,6 @@ import {
   Phone,
   Calendar,
   User,
-  ChevronDown,
   MessageSquare,
   CheckCircle2,
   Clock,
@@ -32,9 +26,8 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
 import PagesLoader from "../../../components/shared/PagesLoader";
-import { auditLogger } from "../../../service/auditLogger";
+import { useRequest } from "../../../store/MasterContext/RequestContext";
 
 // Purple & Blue Color Palette
 const colors = {
@@ -53,48 +46,16 @@ const colors = {
   lavender: "#EDE7F6",
 };
 
-interface PurchaseRequest {
-  id: string;
-  customerName: string;
-  customerPhone: string;
-  modelId: string;
-  requestedUnits: number;
-  status: "new" | "in_review" | "contacted" | "approved" | "rejected" | "completed";
-  createdAt: any;
-  assignedUnits?: any[];
-  internalNotes?: any[];
-}
-
 export default function PurchaseRequests() {
-  const [requests, setRequests] = useState<PurchaseRequest[]>([]);
-  const [filteredRequests, setFilteredRequests] = useState<PurchaseRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { requests, loading, fetchRequests, updateRequestStatus } = useRequest();
+  const [filteredRequests, setFilteredRequests] = useState(requests);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const navigate = useNavigate();
 
-  const fetchRequests = async () => {
-    setLoading(true);
-    try {
-      const q = query(collection(db, "purchaseRequests"), orderBy("createdAt", "desc"));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as PurchaseRequest[];
-      setRequests(data);
-      setFilteredRequests(data);
-    } catch (error) {
-      console.error("Error fetching requests:", error);
-      toast.error("Failed to fetch purchase requests");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchRequests();
-  }, []);
+  }, [fetchRequests]);
 
   useEffect(() => {
     let filtered = requests;
@@ -114,54 +75,6 @@ export default function PurchaseRequests() {
 
     setFilteredRequests(filtered);
   }, [searchTerm, statusFilter, requests]);
-
-  const handleStatusChange = async (requestId: string, newStatus: string) => {
-    try {
-      const docRef = doc(db, "purchaseRequests", requestId);
-      
-      // Get current data before update
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) {
-        toast.error("Request not found");
-        return;
-      }
-      
-      const beforeData = docSnap.data();
-      const oldStatus = beforeData.status;
-      
-      await updateDoc(docRef, {
-        status: newStatus,
-        [`${newStatus}At`]: new Date().toISOString(),
-      });
-
-      // 🔥 LOG AUDIT: Request Status Changed
-      await auditLogger.log({
-        action: "CHANGED_REQUEST_STATUS",
-        entityType: "purchaseRequest",
-        entityId: requestId,
-        entityName: `Request from ${beforeData.customerName || "Unknown"}`,
-        before: {
-          status: oldStatus,
-          customerName: beforeData.customerName,
-          modelId: beforeData.modelId,
-          requestedUnits: beforeData.requestedUnits,
-        },
-        after: {
-          status: newStatus,
-          customerName: beforeData.customerName,
-          modelId: beforeData.modelId,
-          requestedUnits: beforeData.requestedUnits,
-        },
-      });
-
-      toast.success(`Status updated to ${newStatus}`);
-      fetchRequests();
-    } catch (error) {
-      console.error("Error updating status:", error);
-      toast.error("Failed to update status");
-    }
-  };
-
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -580,59 +493,26 @@ export default function PurchaseRequests() {
                   </div>
 
                   <div className="flex gap-2 items-start ml-4">
-                    <FormControl size="small" sx={{ minWidth: 140 }}>
-                      <Select
-                        value={request.status}
-                        onChange={(e) => handleStatusChange(request.id, e.target.value)}
-                        sx={{
-                          bgcolor: statusStyle.bgcolor,
-                          color: statusStyle.color,
-                          fontWeight: 600,
-                          "& .MuiOutlinedInput-notchedOutline": {
-                            border: "none",
-                          },
-                          borderRadius: 2,
-                        }}
-                        IconComponent={ChevronDown}
-                      >
-                        <MenuItem value="new">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle size={16} />
-                            New
-                          </div>
-                        </MenuItem>
-                        <MenuItem value="in_review">
-                          <div className="flex items-center gap-2">
-                            <Clock size={16} />
-                            In Review
-                          </div>
-                        </MenuItem>
-                        <MenuItem value="contacted">
-                          <div className="flex items-center gap-2">
-                            <Phone size={16} />
-                            Contacted
-                          </div>
-                        </MenuItem>
-                        <MenuItem value="approved">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 size={16} />
-                            Approved
-                          </div>
-                        </MenuItem>
-                        <MenuItem value="rejected">
-                          <div className="flex items-center gap-2">
-                            <XCircle size={16} />
-                            Rejected
-                          </div>
-                        </MenuItem>
-                        <MenuItem value="completed">
-                          <div className="flex items-center gap-2">
-                            <Package size={16} />
-                            Completed
-                          </div>
-                        </MenuItem>
-                      </Select>
-                    </FormControl>
+                    <select
+                      value={request.status}
+                      onChange={(e) => updateRequestStatus(request.id, e.target.value as any)}
+                      style={{
+                        backgroundColor: statusStyle.bgcolor,
+                        color: statusStyle.color,
+                        fontWeight: 600,
+                        border: "none",
+                        borderRadius: "8px",
+                        padding: "8px 12px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="new">New</option>
+                      <option value="in_review">In Review</option>
+                      <option value="contacted">Contacted</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                      <option value="completed">Completed</option>
+                    </select>
 
                     <Button
                       variant="contained"

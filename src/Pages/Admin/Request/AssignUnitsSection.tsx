@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { doc, updateDoc, arrayUnion, collection, getDocs, getDoc } from "firebase/firestore";
-import { db, auth } from "../../../service/firebase";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../../service/firebase";
 import { TextField, Button } from "@mui/material";
-import toast from "react-hot-toast";
-import { auditLogger } from "../../../service/auditLogger";
 import { Check } from "lucide-react";
+import { useRequest } from "../../../store/MasterContext/RequestContext";
 
 type GeneratorModel = {
   id: string;
@@ -13,6 +12,7 @@ type GeneratorModel = {
 };
 
 const AssignUnitsSection = ({ request }: any) => {
+  const { assignUnit, addInternalNote, completeRequest } = useRequest();
   const [models, setModels] = useState<GeneratorModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [serial, setSerial] = useState("");
@@ -32,146 +32,39 @@ const AssignUnitsSection = ({ request }: any) => {
 
   // assign unit models 
   const handleAssignUnit = async () => {
-    if (!selectedModel || !serial) {
-      toast.error("Please select model and serial.");
-      return;
-      
-    }
+    if (!selectedModel || !serial) return;
+    
     setLoading(true);
-
     try {
-      const adminUid = auth.currentUser?.uid;
-      if (!adminUid) throw new Error('Not authenticated');
-
-      const ref = doc(db, "purchaseRequests", request.id);
-
-      const newUnit = {
-        modelId: selectedModel,
-        serial: serial,
-        assignedAt: new Date().toISOString()
-      };
-
-      await updateDoc(ref, {
-        assignedUnits: arrayUnion(newUnit)
-      });
-
-      // Get model name
-      const modelDoc = await getDoc(doc(db, "generatorModels", selectedModel));
-      const modelName = modelDoc.exists() ? modelDoc.data().name : selectedModel;
-
-      // 🔥 LOG AUDIT: Unit Assigned to Request
-      await auditLogger.log({
-        action: "ASSIGNED_UNIT_TO_REQUEST",
-        entityType: "purchaseRequest",
-        entityId: request.id,
-        entityName: `Request from ${request.customerName || "Unknown"}`,
-        after: {
-          unit: {
-            modelId: selectedModel,
-            modelName: modelName,
-            serial: serial,
-          }
-        },
-      });
-
-      toast.success("Unit Assigned!");
+      await assignUnit(request.id, { modelId: selectedModel, serial });
       setSelectedModel("");
       setSerial("");
-      
-      // Refresh page or parent component
       window.location.reload();
-    } catch (error) {
-      console.error("Error assigning unit:", error);
-      toast.error("Failed to assign unit");
-    }
-    finally {
+    } finally {
       setLoading(false);
     }
   };
 
   // add internal note
   const handleAddNote = async () => {
-    if (!note.trim()) {
-      toast.error("Note cannot be empty");
-      return;
-    }
+    if (!note.trim()) return;
 
     try {
-      const adminUid = auth.currentUser?.uid;
-      const adminName = localStorage.getItem("userName") || "Admin";
-      
-      if (!adminUid) throw new Error('Not authenticated');
-
-      const ref = doc(db, "purchaseRequests", request.id);
-
-      const newNote = {
-        note,
-        createdAt: new Date().toISOString(),
-        createdBy: adminUid,
-        createdByName: adminName
-      };
-
-      await updateDoc(ref, {
-        internalNotes: arrayUnion(newNote)
-      });
-
-      // 🔥 LOG AUDIT: Note Added to Request
-      await auditLogger.log({
-        action: "ADDED_REQUEST_NOTE",
-        entityType: "purchaseRequest",
-        entityId: request.id,
-        entityName: `Request from ${request.customerName || "Unknown"}`,
-        after: {
-          note: note.substring(0, 100) + (note.length > 100 ? "..." : "")
-        },
-      });
-
-      toast.success("Note added!");
+      await addInternalNote(request.id, note);
       setNote("");
-      
-      // Refresh page or parent component
       window.location.reload();
     } catch (error) {
       console.error("Error adding note:", error);
-      toast.error("Failed to add note");
     }
   };
 
   // complete request case
   const handleCompleteRequest = async () => {
     try {
-      const adminUid = auth.currentUser?.uid;
-      if (!adminUid) throw new Error('Not authenticated');
-
-      const ref = doc(db, "purchaseRequests", request.id);
-
-      // Get current status before update
-      const docSnap = await getDoc(ref);
-      const oldStatus = docSnap.exists() ? docSnap.data().status : "unknown";
-
-      await updateDoc(ref, {
-        status: "completed"
-      });
-
-      // 🔥 LOG AUDIT: Request Completed
-      await auditLogger.log({
-        action: "COMPLETED_REQUEST",
-        entityType: "purchaseRequest",
-        entityId: request.id,
-        entityName: `Request from ${request.customerName || "Unknown"}`,
-        before: {
-          status: oldStatus,
-        },
-        after: {
-          status: "completed",
-        },
-      });
-
+      await completeRequest(request.id);
       setCompleted(true);
-      toast.success("Request marked as completed!");
     } catch (error) {
       console.error("Error completing request:", error);
-      toast.error("Failed to complete request");
     }
   };
 

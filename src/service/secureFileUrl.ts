@@ -1,12 +1,24 @@
 // src/service/secureFileUrl.ts
 /**
- * Converts a Firebase Storage URL or file path to a secure proxy URL
+ * Converts a Firebase Storage file path to a secure proxy URL
  * The proxy URL hides the bucket name, token, and file structure
- * 
- * Example:
- * Input: https://firebasestorage.googleapis.com/v0/b/thinkstudio-cpt.firebasestorage.app/o/generators%2F...
- * Output: https://us-central1-thinkstudio-cpt.cloudfunctions.net/serveFile?fid=Z2VuZXJhdG9ycy9nYWxsZXJ5LWltYWdlcy8xNzA0MDY3MjAwMDAwLWltYWdlLmpwZw==
  */
+
+// Get the function URL from environment or construct it dynamically
+const getFunctionBaseUrl = (): string => {
+  // Try to get from environment variable first
+  const envUrl = import.meta.env.VITE_CLOUD_FUNCTION_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+
+  // Fallback to hardcoded project URL
+  // Format: https://us-central1-PROJECT_ID.cloudfunctions.net
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "thinkstudio-cpt";
+  const region = import.meta.env.VITE_CLOUD_FUNCTION_REGION || "us-central1";
+  
+  return `https://${region}-${projectId}.cloudfunctions.net`;
+};
 
 /**
  * Generate a secure proxy URL for a file
@@ -14,11 +26,14 @@
  * @returns Secure proxy URL
  */
 export const getSecureFileUrl = (filePath: string): string => {
-  // Encode the file path to base64 using browser's btoa function (works in frontend)
+  // Encode the file path to base64 using browser's btoa function
   const encodedFileId = btoa(unescape(encodeURIComponent(filePath)));
   
+  // Get the base function URL
+  const baseUrl = getFunctionBaseUrl();
+  
   // Return the secure proxy URL
-  return `https://us-central1-thinkstudio-cpt.cloudfunctions.net/serveFile?fid=${encodedFileId}`;
+  return `${baseUrl}/serveFile?fid=${encodedFileId}`;
 };
 
 /**
@@ -35,7 +50,7 @@ export const extractFilePathFromSecureUrl = (secureUrl: string): string => {
       throw new Error("Missing file ID in URL");
     }
     
-    // Decode the base64 file ID back to the original path using browser's atob function
+    // Decode the base64 file ID back to the original path
     const filePath = decodeURIComponent(escape(atob(fileId)));
     return filePath;
   } catch (error) {

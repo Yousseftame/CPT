@@ -77,7 +77,7 @@ export default function NotFound() {
               </div>
             </button>
 
-            <button
+            {/* <button
               onClick={() => navigate("/dashboard")}
               className="group relative px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-2xl overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg shadow-purple-500/50"
             >
@@ -86,7 +86,7 @@ export default function NotFound() {
                 <Home size={20} />
                 Back to Home
               </div>
-            </button>
+            </button> */}
           </div>
 
           {/* Fun Message */}

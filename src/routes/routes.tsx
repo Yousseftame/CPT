@@ -1,3 +1,4 @@
+// src/routes/routes.tsx
 import { createBrowserRouter } from "react-router-dom";
 
 // Layouts
@@ -66,7 +67,7 @@ export const routes = createBrowserRouter([
     element: <Unauthorized />,
   },
   {
-    path: "",
+    path: "/",
     element: (
       <ProtectedRoute allowedRoles={["admin", "superAdmin"]}>
         <MasterLayout />
@@ -76,19 +77,11 @@ export const routes = createBrowserRouter([
     children: [
       {
         index: true,
-        element: (
-          <ProtectedRoute allowedRoles={["admin", "superAdmin"]}>
-            <Dashboard />
-          </ProtectedRoute>
-        ),
+        element: <Dashboard />,
       },
       {
         path: "dashboard",
-        element: (
-          <ProtectedRoute allowedRoles={["admin", "superAdmin"]}>
-            <Dashboard />
-          </ProtectedRoute>
-        ),
+        element: <Dashboard />,
       },
 
       // Customer routes
@@ -156,5 +149,9 @@ export const routes = createBrowserRouter([
         ),
       },
     ],
+  },
+  {
+    path: "*",
+    element: <NotFound />,
   },
 ]);

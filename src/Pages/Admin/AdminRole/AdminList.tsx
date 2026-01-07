@@ -51,6 +51,7 @@ export default function AdminList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+const [statusLoading, setStatusLoading] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -84,10 +85,20 @@ export default function AdminList() {
 
   const handleStatusToggle = async (adminId: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
+   setStatusLoading(prev => ({
+    ...prev,
+    [adminId]: true,
+  }));
     try {
       await updateAdminStatus(adminId, newStatus as "active" | "inactive");
     } catch (error) {
       console.error("Error toggling status:", error);
+    }
+    finally {
+      setStatusLoading(prev => ({
+      ...prev,
+      [adminId]: false,
+    }));
     }
   };
 
@@ -462,12 +473,13 @@ export default function AdminList() {
                       onChange={() => handleStatusToggle(admin.id, admin.status)}
                       sx={{
                         "& .MuiSwitch-switchBase.Mui-checked": {
-                          color: colors.success,
+                          color: colors.error,
                         },
                         "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                          backgroundColor: colors.success,
+                          backgroundColor: colors.error,
                         },
                       }}
+                      disabled={statusLoading[admin.id]}
                     />
                   </div>
 

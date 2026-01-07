@@ -1,3 +1,4 @@
+// src/components/ProtectedRoute/ProtectedRoute.tsx
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../../store/AuthContext/AuthContext";
 import { useEffect, useState } from "react";
@@ -18,7 +19,6 @@ const ProtectedRoute = ({
   const [adminStatus, setAdminStatus] = useState<string | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
 
-  // Check admin status from Firestore
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!user?.uid || loading) {
@@ -44,32 +44,32 @@ const ProtectedRoute = ({
     checkAdminStatus();
   }, [user, loading]);
 
-  // 1️⃣ Still checking auth or status
+  // Still checking auth or status
   if (loading || checkingStatus) {
     return <FullScreenLoader />;
   }
 
-  // 2️⃣ Not logged in
+  // Not logged in - redirect to login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // 3️⃣ Email not verified
+  // Email not verified
   if (!user.emailVerified) {
     return <Navigate to="/verify-account" replace />;
   }
 
-  // 4️⃣ Admin account is inactive
+  // Admin account is inactive
   if (adminStatus === "inactive") {
     return <Navigate to="/unauthorized" replace />;
   }
 
-  // 5️⃣ Logged in BUT not admin/superAdmin
+  // Not admin/superAdmin or role doesn't match allowedRoles
   if (!role || !allowedRoles.includes(role)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
-  // 6️⃣ Authorized
+  // All checks passed - render children
   return <>{children}</>;
 };
 

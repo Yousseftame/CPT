@@ -1,4 +1,4 @@
-// src/service/phoneAuthService.ts (FIXED)
+// src/service/phoneAuthService.ts (FIXED - Proper reCAPTCHA Loading)
 
 import {
   signInWithPhoneNumber,
@@ -13,50 +13,94 @@ import { trackLoginDirect } from './loginTracker';
 
 let recaptchaVerifier: RecaptchaVerifier | null = null;
 let confirmationResult: ConfirmationResult | null = null;
+let recaptchaReady = false;
+let recaptchaReadyPromise: Promise<void> | null = null;
+
+/**
+ * Wait for reCAPTCHA script to load
+ */
+const waitForRecaptcha = (): Promise<void> => {
+  if (recaptchaReadyPromise) {
+    return recaptchaReadyPromise;
+  }
+
+  recaptchaReadyPromise = new Promise((resolve, reject) => {
+    const maxAttempts = 50; // 5 seconds max
+    let attempts = 0;
+
+    const checkRecaptcha = () => {
+      if ((window as any).grecaptcha) {
+        recaptchaReady = true;
+        resolve();
+      } else if (attempts < maxAttempts) {
+        attempts++;
+        setTimeout(checkRecaptcha, 100);
+      } else {
+        reject(new Error('reCAPTCHA script failed to load. Please refresh the page.'));
+      }
+    };
+
+    checkRecaptcha();
+  });
+
+  return recaptchaReadyPromise;
+};
 
 /**
  * Initialize reCAPTCHA verifier
  * IMPORTANT: Call this BEFORE sending OTP
  */
-export const initializeRecaptcha = (containerId: string = 'recaptcha-container'): RecaptchaVerifier => {
-  try {
-    // Clear existing verifier
-    if (recaptchaVerifier) {
-      try {
-        recaptchaVerifier.clear();
-      } catch (e) {
-        console.log('Could not clear existing verifier');
+export const initializeRecaptcha = (containerId: string = 'recaptcha-container'): Promise<RecaptchaVerifier> => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Clear existing verifier
+      if (recaptchaVerifier) {
+        try {
+          recaptchaVerifier.clear();
+        } catch (e) {
+          console.log('Could not clear existing verifier');
+        }
+        recaptchaVerifier = null;
       }
+
+      // Wait for reCAPTCHA script to load
+      try {
+        await waitForRecaptcha();
+      } catch (error) {
+        reject(error);
+        return;
+      }
+
+      // Verify the container exists
+      const container = document.getElementById(containerId);
+      if (!container) {
+        reject(new Error(`reCAPTCHA container with id "${containerId}" not found in DOM`));
+        return;
+      }
+
+      // Create new verifier
+      recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+        size: 'invisible',
+        callback: (token: any) => {
+          console.log('✅ reCAPTCHA verified');
+        },
+        'expired-callback': () => {
+          console.log('⚠️ reCAPTCHA token expired');
+          recaptchaVerifier = null;
+        },
+        'error-callback': (error: any) => {
+          console.error('❌ reCAPTCHA error:', error);
+          recaptchaVerifier = null;
+        },
+      });
+
+      resolve(recaptchaVerifier);
+    } catch (error) {
+      console.error('Failed to initialize reCAPTCHA:', error);
       recaptchaVerifier = null;
+      reject(error);
     }
-
-    // Wait for reCAPTCHA script to load
-    if (!(window as any).grecaptcha) {
-      throw new Error('reCAPTCHA script not loaded. Make sure it\'s included in your HTML.');
-    }
-
-    // Create new verifier
-    recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-      size: 'invisible',
-      callback: (token :any) => {
-        console.log('✅ reCAPTCHA verified');
-      },
-      'expired-callback': () => {
-        console.log('⚠️ reCAPTCHA token expired');
-        recaptchaVerifier = null;
-      },
-      'error-callback': (error :any) => {
-        console.error('❌ reCAPTCHA error:', error);
-        recaptchaVerifier = null;
-      },
-    });
-
-    return recaptchaVerifier;
-  } catch (error) {
-    console.error('Failed to initialize reCAPTCHA:', error);
-    recaptchaVerifier = null;
-    throw error;
-  }
+  });
 };
 
 /**
@@ -97,7 +141,12 @@ export const sendPhoneOTP = async (phoneNumber: string): Promise<ConfirmationRes
     // Initialize reCAPTCHA BEFORE sending OTP
     if (!recaptchaVerifier) {
       console.log('🔄 Initializing reCAPTCHA...');
-      initializeRecaptcha();
+      try {
+        recaptchaVerifier = await initializeRecaptcha();
+      } catch (error) {
+        console.error('Failed to initialize reCAPTCHA:', error);
+        throw error;
+      }
     }
 
     // Send OTP with cleaned phone number

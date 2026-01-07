@@ -9,6 +9,7 @@ import { AdminProvider } from './store/MasterContext/AdminContext.tsx'
 import { RequestProvider } from './store/MasterContext/RequestContext.tsx'
 
 createRoot(document.getElementById('root')!).render(
+  
   <StrictMode>
     <AuthProvider>
       <CustomerProvider>

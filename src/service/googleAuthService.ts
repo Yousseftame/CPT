@@ -2,8 +2,7 @@
 
 import { 
   signInWithPopup, 
-  GoogleAuthProvider, 
-  createUserWithEmailAndPassword,
+  
   signOut
 } from 'firebase/auth';
 import { auth, db, googleProvider } from './firebase';

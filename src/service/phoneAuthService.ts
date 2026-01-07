@@ -1,4 +1,4 @@
-// src/service/phoneAuthService.ts (FIXED - Proper reCAPTCHA Loading)
+// src/service/phoneAuthService.ts (COMPLETELY FIXED)
 
 import {
   signInWithPhoneNumber,
@@ -13,94 +13,111 @@ import { trackLoginDirect } from './loginTracker';
 
 let recaptchaVerifier: RecaptchaVerifier | null = null;
 let confirmationResult: ConfirmationResult | null = null;
-let recaptchaReady = false;
-let recaptchaReadyPromise: Promise<void> | null = null;
 
 /**
  * Wait for reCAPTCHA script to load
  */
 const waitForRecaptcha = (): Promise<void> => {
-  if (recaptchaReadyPromise) {
-    return recaptchaReadyPromise;
-  }
+  return new Promise((resolve, reject) => {
+    // Check if already loaded
+    if ((window as any).grecaptcha && (window as any).grecaptcha.render) {
+      console.log('✅ reCAPTCHA already loaded');
+      resolve();
+      return;
+    }
 
-  recaptchaReadyPromise = new Promise((resolve, reject) => {
-    const maxAttempts = 50; // 5 seconds max
+    console.log('⏳ Waiting for reCAPTCHA to load...');
+    
     let attempts = 0;
+    const maxAttempts = 150; // 15 seconds
+    const checkInterval = 100; // Check every 100ms
 
     const checkRecaptcha = () => {
-      if ((window as any).grecaptcha) {
-        recaptchaReady = true;
+      attempts++;
+      
+      if ((window as any).grecaptcha && (window as any).grecaptcha.render) {
+        console.log(`✅ reCAPTCHA loaded after ${attempts * checkInterval}ms`);
         resolve();
-      } else if (attempts < maxAttempts) {
-        attempts++;
-        setTimeout(checkRecaptcha, 100);
+      } else if (attempts >= maxAttempts) {
+        console.error('❌ reCAPTCHA failed to load after 15 seconds');
+        reject(new Error(
+          'reCAPTCHA failed to load. Please check:\n' +
+          '1. Your internet connection\n' +
+          '2. Ad blockers or privacy extensions are disabled\n' +
+          '3. Your firewall allows Google services\n' +
+          '4. Try refreshing the page'
+        ));
       } else {
-        reject(new Error('reCAPTCHA script failed to load. Please refresh the page.'));
+        setTimeout(checkRecaptcha, checkInterval);
       }
     };
 
     checkRecaptcha();
   });
-
-  return recaptchaReadyPromise;
 };
 
 /**
  * Initialize reCAPTCHA verifier
- * IMPORTANT: Call this BEFORE sending OTP
  */
-export const initializeRecaptcha = (containerId: string = 'recaptcha-container'): Promise<RecaptchaVerifier> => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      // Clear existing verifier
-      if (recaptchaVerifier) {
-        try {
-          recaptchaVerifier.clear();
-        } catch (e) {
-          console.log('Could not clear existing verifier');
-        }
-        recaptchaVerifier = null;
-      }
-
-      // Wait for reCAPTCHA script to load
+export const initializeRecaptcha = async (
+  containerId: string = 'recaptcha-container'
+): Promise<RecaptchaVerifier> => {
+  try {
+    // Clear existing verifier
+    if (recaptchaVerifier) {
       try {
-        await waitForRecaptcha();
-      } catch (error) {
-        reject(error);
-        return;
+        recaptchaVerifier.clear();
+        console.log('🧹 Cleared existing reCAPTCHA verifier');
+      } catch (e) {
+        console.log('Note: Could not clear existing verifier');
       }
-
-      // Verify the container exists
-      const container = document.getElementById(containerId);
-      if (!container) {
-        reject(new Error(`reCAPTCHA container with id "${containerId}" not found in DOM`));
-        return;
-      }
-
-      // Create new verifier
-      recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-        size: 'invisible',
-        callback: (token: any) => {
-          console.log('✅ reCAPTCHA verified');
-        },
-        'expired-callback': () => {
-          console.log('⚠️ reCAPTCHA token expired');
-          recaptchaVerifier = null;
-        },
-        'error-callback': (error: any) => {
-          console.error('❌ reCAPTCHA error:', error);
-          recaptchaVerifier = null;
-        },
-      });
-
-      resolve(recaptchaVerifier);
-    } catch (error) {
-      console.error('Failed to initialize reCAPTCHA:', error);
       recaptchaVerifier = null;
-      reject(error);
     }
-  });
+
+    // Wait for reCAPTCHA script to load
+    console.log('🔄 Waiting for reCAPTCHA script...');
+    await waitForRecaptcha();
+
+    // Verify the container exists
+    const container = document.getElementById(containerId);
+    if (!container) {
+      throw new Error(
+        `reCAPTCHA container #${containerId} not found. ` +
+        `Make sure you have <div id="${containerId}"></div> in your Login component.`
+      );
+    }
+
+    console.log('🔧 Creating reCAPTCHA verifier...');
+
+    // Create new verifier
+    recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+      size: 'invisible',
+      callback: () => {
+        console.log('✅ reCAPTCHA verified successfully');
+      },
+      'expired-callback': () => {
+        console.warn('⚠️ reCAPTCHA token expired');
+        recaptchaVerifier = null;
+      },
+      'error-callback': (error: any) => {
+        console.error('❌ reCAPTCHA error:', error);
+        recaptchaVerifier = null;
+      },
+    });
+
+    // Render the verifier
+    await recaptchaVerifier.render();
+    console.log('✅ reCAPTCHA verifier initialized successfully');
+
+    return recaptchaVerifier;
+  } catch (error: any) {
+    console.error('❌ Failed to initialize reCAPTCHA:', error);
+    recaptchaVerifier = null;
+    throw new Error(
+      error.message || 
+      'Failed to initialize phone verification. Please refresh the page and try again.'
+    );
+  }
 };
 
 /**
@@ -110,8 +127,9 @@ export const clearRecaptcha = () => {
   if (recaptchaVerifier) {
     try {
       recaptchaVerifier.clear();
+      console.log('🧹 Cleared reCAPTCHA verifier');
     } catch (e) {
-      console.log('Could not clear verifier');
+      console.log('Note: Could not clear verifier');
     }
     recaptchaVerifier = null;
   }
@@ -119,7 +137,6 @@ export const clearRecaptcha = () => {
 
 /**
  * Send OTP to phone number
- * @param phoneNumber - Phone number in E.164 format (e.g., +15551234567)
  */
 export const sendPhoneOTP = async (phoneNumber: string): Promise<ConfirmationResult> => {
   try {
@@ -131,29 +148,25 @@ export const sendPhoneOTP = async (phoneNumber: string): Promise<ConfirmationRes
     // Remove all non-digit characters except +
     const cleanPhoneNumber = phoneNumber.replace(/[^\d+]/g, '');
 
-    // Validate length (E.164 format: +[1-3 digits country code][subscriber number])
+    // Validate length
     if (cleanPhoneNumber.length < 10 || cleanPhoneNumber.length > 15) {
-      throw new Error('Phone number must be 10-15 digits (excluding country code formatting)');
+      throw new Error('Phone number must be 10-15 digits');
     }
 
     console.log('📱 Sending OTP to:', cleanPhoneNumber);
 
-    // Initialize reCAPTCHA BEFORE sending OTP
+    // Initialize reCAPTCHA if not already done
     if (!recaptchaVerifier) {
       console.log('🔄 Initializing reCAPTCHA...');
-      try {
-        recaptchaVerifier = await initializeRecaptcha();
-      } catch (error) {
-        console.error('Failed to initialize reCAPTCHA:', error);
-        throw error;
-      }
+      recaptchaVerifier = await initializeRecaptcha();
     }
 
-    // Send OTP with cleaned phone number
+    // Send OTP
+    console.log('📤 Requesting OTP from Firebase...');
     confirmationResult = await signInWithPhoneNumber(
       auth,
       cleanPhoneNumber,
-      recaptchaVerifier!
+      recaptchaVerifier
     );
 
     console.log('✅ OTP sent successfully');
@@ -166,28 +179,19 @@ export const sendPhoneOTP = async (phoneNumber: string): Promise<ConfirmationRes
     clearRecaptcha();
     confirmationResult = null;
 
-    // Provide user-friendly error messages
+    // User-friendly error messages
     if (error.code === 'auth/invalid-phone-number') {
-      throw new Error('Invalid phone number. Make sure it includes the country code (e.g., +1 for USA).');
+      throw new Error('Invalid phone number. Include country code (e.g., +1 for USA)');
     } else if (error.code === 'auth/too-many-requests') {
-      throw new Error('Too many attempts. Please wait a few minutes before trying again.');
+      throw new Error('Too many attempts. Please wait before trying again.');
     } else if (error.code === 'auth/invalid-app-credential') {
       throw new Error(
-        'Phone authentication not properly configured. ' +
-        'Please ensure:\n' +
-        '1. Phone sign-in is enabled in Firebase Console\n' +
-        '2. reCAPTCHA v3 is configured\n' +
-        '3. Your app domain is authorized in Google Cloud Console'
+        'Phone authentication not configured. Please contact support.'
       );
     } else if (error.code === 'auth/missing-client-identifier') {
-      throw new Error('reCAPTCHA verification failed. Please refresh and try again.');
-    } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
-      throw new Error(
-        'Phone authentication is not supported in this environment. ' +
-        'Make sure you\'re accessing from an HTTPS domain (localhost works in dev).'
-      );
-    } else if (error.message?.includes('Invalid phone')) {
-      throw new Error('Invalid phone number format. Example: +1 (555) 123-4567');
+      throw new Error('Verification failed. Please refresh and try again.');
+    } else if (error.message?.includes('reCAPTCHA')) {
+      throw error; // Re-throw reCAPTCHA errors as-is
     } else {
       throw new Error(error.message || 'Failed to send OTP. Please try again.');
     }
@@ -203,7 +207,7 @@ export const verifyPhoneOTP = async (otp: string) => {
       throw new Error('OTP request expired. Please request a new OTP.');
     }
 
-    const cleanOTP = otp.replace(/\s/g, ''); // Remove spaces
+    const cleanOTP = otp.replace(/\s/g, '');
 
     if (cleanOTP.length !== 6) {
       throw new Error('OTP must be 6 digits');
@@ -224,7 +228,6 @@ export const verifyPhoneOTP = async (otp: string) => {
     if (!docSnap.exists()) {
       console.log('👤 Creating new admin account from phone sign-in');
       
-      // Create new admin account
       await setDoc(docRef, {
         uid: user.uid,
         name: 'Phone User',
@@ -239,7 +242,6 @@ export const verifyPhoneOTP = async (otp: string) => {
         phoneVerified: true,
       });
 
-      // Log creation
       await auditLogger.log({
         action: 'ADMIN_CREATED_PHONE',
         entityType: 'admin',
@@ -255,13 +257,11 @@ export const verifyPhoneOTP = async (otp: string) => {
       
       const adminData = docSnap.data();
 
-      // Check if account is active
       if (adminData.status === 'inactive') {
         await signOut(auth);
         throw new Error('Account is inactive. Please contact a super admin.');
       }
 
-      // Update last login
       await setDoc(
         docRef,
         {
@@ -273,7 +273,7 @@ export const verifyPhoneOTP = async (otp: string) => {
       );
     }
 
-    // Store admin data in localStorage
+    // Store admin data
     const adminDoc = await getDoc(docRef);
     if (adminDoc.exists()) {
       const data = adminDoc.data();
@@ -298,10 +298,8 @@ export const verifyPhoneOTP = async (otp: string) => {
       throw new Error('Invalid OTP code. Please try again.');
     } else if (error.code === 'auth/code-expired') {
       throw new Error('OTP has expired. Please request a new one.');
-    } else if (error.message?.includes('too many unsuccessful')) {
-      throw new Error('Too many failed attempts. Please request a new OTP.');
     } else if (error.message?.includes('Account is inactive')) {
-      throw error; // Re-throw our custom error
+      throw error;
     } else {
       throw new Error(error.message || 'Failed to verify OTP.');
     }
@@ -332,6 +330,7 @@ export const resendPhoneOTP = async (phoneNumber: string): Promise<ConfirmationR
 export const cancelPhoneSignIn = () => {
   confirmationResult = null;
   clearRecaptcha();
+  console.log('🚫 Phone sign-in cancelled');
 };
 
 /**

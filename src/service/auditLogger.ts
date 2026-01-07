@@ -241,6 +241,8 @@ export const logCustomerCreated = async (customerId: string, customerData: any) 
   });
 };
 
+
+
 export const logCustomerUpdated = async (customerId: string, before: any, after: any) => {
   await auditLogger.log({
     action: "UPDATED_CUSTOMER",

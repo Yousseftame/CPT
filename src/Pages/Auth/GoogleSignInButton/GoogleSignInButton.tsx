@@ -80,7 +80,7 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       />
 
       <span>
-        {loading ? 'Signing in…' : 'Continue with Google'}
+        {loading ? 'Signing in…' : ' Google  "Disabled" '}
       </span>
 
       {/* Loading Spinner */}

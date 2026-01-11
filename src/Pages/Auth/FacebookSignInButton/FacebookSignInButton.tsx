@@ -83,7 +83,7 @@ const FacebookSignInButton: React.FC<FacebookSignInButtonProps> = ({
       </svg>
 
       <span>
-        {loading ? 'Signing in…' : 'Continue with Facebook'}
+        {loading ? 'Signing in…' : 'Facebook  "Disabled"'}
       </span>
 
       {loading && (

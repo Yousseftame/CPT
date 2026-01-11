@@ -206,12 +206,13 @@ const Login = () => {
           </button>
           
           <button
+          
             type="button"
             onClick={() => {
               setActiveTab('phone');
               setError('');
             }}
-            disabled={loading}
+            disabled
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md font-medium transition-all duration-200 ${
               activeTab === 'phone'
                 ? 'bg-white text-purple-600 shadow-sm'
@@ -219,7 +220,7 @@ const Login = () => {
             } disabled:opacity-50`}
           >
             <PhoneIcon size={18} />
-            <span>Phone</span>
+            <span>Phone "Disabled"</span>
           </button>
         </div>
       </div>
@@ -331,7 +332,7 @@ const Login = () => {
       <div className="space-y-3">
         <GoogleSignInButton
           fullWidth
-          disabled={loading}
+          disabled
           onSuccess={(uid: any) => {
             console.log('✅ User signed in with Google:', uid);
           }}
@@ -341,7 +342,8 @@ const Login = () => {
           }}
         />
         
-        <FacebookSignInButton />
+        <FacebookSignInButton 
+        disabled/>
       </div>
 
       <p className="text-center text-sm text-gray-600 mt-8">

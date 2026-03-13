@@ -48,6 +48,7 @@ import Unauthorized from "../Pages/Unauthorized/Unauthorized";
 
 // Components
 import ProtectedRoute from "../components/ProtectedRoute/ProtectedRoute";
+import Register from "../Pages/Auth/Register/Register";
 
 export const routes = createBrowserRouter([
   {
@@ -57,6 +58,7 @@ export const routes = createBrowserRouter([
     children: [
       { index: true, element: <Login /> },
       { path: "login", element: <Login /> },
+      { path: "register", element: <Register /> },
       { path: "reset-password", element: <ResetPassword /> },
       { path: "forget-password", element: <ForgetPassword /> },
       { path: "verify-account", element: <VerifyAccount /> },

@@ -47,7 +47,7 @@ const VerifyAccount = () => {
           return prev - 1;
         });
       }, 1000);
-
+      
       return () => clearInterval(timer);
     }
   }, [cooldownSeconds]);
